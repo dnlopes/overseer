@@ -1,0 +1,48 @@
+=== RUN   TestNew_ReturnsNonNil
+--- PASS: TestNew_ReturnsNonNil (0.00s)
+=== RUN   TestBorderStyles_FocusedDiffersFromBlurred
+--- PASS: TestBorderStyles_FocusedDiffersFromBlurred (0.00s)
+=== RUN   TestAllStyles_NonEmptyRender
+=== RUN   TestAllStyles_NonEmptyRender/Border.Focused
+=== RUN   TestAllStyles_NonEmptyRender/Border.Blurred
+=== RUN   TestAllStyles_NonEmptyRender/Pane.Sessions
+=== RUN   TestAllStyles_NonEmptyRender/Pane.Status
+=== RUN   TestAllStyles_NonEmptyRender/Pane.Preview
+=== RUN   TestAllStyles_NonEmptyRender/Group.Header
+=== RUN   TestAllStyles_NonEmptyRender/Session.Item.Normal
+=== RUN   TestAllStyles_NonEmptyRender/Session.Item.Selected
+=== RUN   TestAllStyles_NonEmptyRender/Status.Label
+=== RUN   TestAllStyles_NonEmptyRender/Status.Value
+=== RUN   TestAllStyles_NonEmptyRender/Status.Separator
+=== RUN   TestAllStyles_NonEmptyRender/Form.Field.Label
+=== RUN   TestAllStyles_NonEmptyRender/Form.Field.Input
+=== RUN   TestAllStyles_NonEmptyRender/Form.Field.Error
+=== RUN   TestAllStyles_NonEmptyRender/Help.Key
+=== RUN   TestAllStyles_NonEmptyRender/Help.Description
+=== RUN   TestAllStyles_NonEmptyRender/Help.Separator
+=== RUN   TestAllStyles_NonEmptyRender/EmptyState.Title
+=== RUN   TestAllStyles_NonEmptyRender/EmptyState.Hint
+=== RUN   TestAllStyles_NonEmptyRender/TooSmall.Message
+--- PASS: TestAllStyles_NonEmptyRender (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Border.Focused (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Border.Blurred (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Pane.Sessions (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Pane.Status (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Pane.Preview (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Group.Header (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Session.Item.Normal (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Session.Item.Selected (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Status.Label (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Status.Value (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Status.Separator (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Form.Field.Label (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Form.Field.Input (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Form.Field.Error (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Help.Key (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Help.Description (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/Help.Separator (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/EmptyState.Title (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/EmptyState.Hint (0.00s)
+    --- PASS: TestAllStyles_NonEmptyRender/TooSmall.Message (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/styles	(cached)
