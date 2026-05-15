@@ -1,0 +1,23 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosimple
+    - goimports
+    - gocyclo
+    - revive
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+
+issues:
+  exclude-dirs:
+    - testdata
+    - internal/testutil/mocks

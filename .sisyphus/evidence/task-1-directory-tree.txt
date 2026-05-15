@@ -1,0 +1,23 @@
+.
+├── bin
+├── cmd
+│   └── overseer
+│       └── main.go
+├── docs
+│   └── adr
+├── go.mod
+├── internal
+│   ├── adapters
+│   │   ├── primary
+│   │   └── secondary
+│   ├── core
+│   │   ├── domain
+│   │   └── service
+│   ├── shared
+│   └── testutil
+│       ├── fixtures
+│       └── mocks
+├── overseer
+└── testdata
+
+18 directories, 3 files

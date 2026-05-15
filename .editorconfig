@@ -1,0 +1,16 @@
+root = true
+
+[*.go]
+indent_style = tab
+
+[*.yml]
+indent_style = space
+indent_size = 2
+
+[*.yaml]
+indent_style = space
+indent_size = 2
+
+[*.md]
+indent_style = space
+indent_size = 2
