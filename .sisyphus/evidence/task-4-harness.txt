@@ -1,0 +1,12 @@
+?   	github.com/dnlopes/overseer/internal/testutil/fixtures	[no test files]
+=== RUN   TestSetupStripsANSI
+--- PASS: TestSetupStripsANSI (0.00s)
+=== RUN   TestReadBts
+--- PASS: TestReadBts (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/testutil/golden	(cached)
+?   	github.com/dnlopes/overseer/internal/testutil/mocks	[no test files]
+=== RUN   TestNewHarness
+--- PASS: TestNewHarness (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/testutil/teatest	(cached)
