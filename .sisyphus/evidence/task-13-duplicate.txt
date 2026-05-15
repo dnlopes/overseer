@@ -1,0 +1,4 @@
+=== RUN   TestCreateUseCase_DuplicateName
+--- PASS: TestCreateUseCase_DuplicateName (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/service/session	0.159s

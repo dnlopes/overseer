@@ -1,0 +1,6 @@
+=== RUN   TestCreateUseCase_OrderIncrement
+--- PASS: TestCreateUseCase_OrderIncrement (0.00s)
+=== RUN   TestCreateUseCase_FirstSessionOrder
+--- PASS: TestCreateUseCase_FirstSessionOrder (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/service/session	0.178s
