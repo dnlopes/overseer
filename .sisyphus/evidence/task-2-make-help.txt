@@ -1,0 +1,9 @@
+[36mbuild               [0m Build the overseer binary
+[36mtest                [0m Run the unit test suite
+[36mtest-integration    [0m Run integration tests
+[36mupdate-golden       [0m Update golden test files
+[36mlint                [0m Run static analysis
+[36mrun                 [0m Build and run overseer
+[36mclean               [0m Remove build artifacts and test cache
+[36mtidy                [0m Tidy module dependencies
+[36mhelp                [0m Show this help message
