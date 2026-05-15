@@ -1,0 +1,4 @@
+=== RUN   TestLogger_LevelEnv
+--- PASS: TestLogger_LevelEnv (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/logger/slog	0.178s

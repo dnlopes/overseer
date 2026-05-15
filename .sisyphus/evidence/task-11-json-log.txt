@@ -1,0 +1,4 @@
+=== RUN   TestLogger_WritesJSON
+--- PASS: TestLogger_WritesJSON (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/logger/slog	0.177s
