@@ -1,0 +1,10 @@
+=== RUN   TestListUseCase_Empty
+--- PASS: TestListUseCase_Empty (0.00s)
+=== RUN   TestListUseCase_SingleProject
+--- PASS: TestListUseCase_SingleProject (0.00s)
+=== RUN   TestListUseCase_MultipleProjects
+--- PASS: TestListUseCase_MultipleProjects (0.00s)
+=== RUN   TestListUseCase_OrderWithinGroup
+--- PASS: TestListUseCase_OrderWithinGroup (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/service/session	(cached)
