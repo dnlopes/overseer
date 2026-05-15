@@ -1,0 +1,4 @@
+=== RUN   TestRenameUseCase_EmptyName
+--- PASS: TestRenameUseCase_EmptyName (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/service/session	0.164s
