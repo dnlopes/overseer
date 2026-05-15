@@ -274,7 +274,9 @@ func (m Model) reorder(direction int) tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		_, _ = m.reorderUC.Execute(context.Background(), servicesession.ReorderRequest{ID: sess.ID, Direction: direction})
+		if _, err := m.reorderUC.Execute(context.Background(), servicesession.ReorderRequest{ID: sess.ID, Direction: direction}); err != nil {
+			return nil
+		}
 		return m.sessionsList.Init()()
 	}
 }
@@ -323,6 +325,14 @@ func adaptKey(msg tea.KeyPressMsg) teav1.KeyMsg {
 		return teav1.KeyMsg{Type: teav1.KeyEsc}
 	case "ctrl+c":
 		return teav1.KeyMsg{Type: teav1.KeyCtrlC}
+	case "backspace":
+		return teav1.KeyMsg{Type: teav1.KeyBackspace}
+	case "ctrl+k":
+		return teav1.KeyMsg{Type: teav1.KeyCtrlK}
+	case "ctrl+u":
+		return teav1.KeyMsg{Type: teav1.KeyCtrlU}
+	case "ctrl+a":
+		return teav1.KeyMsg{Type: teav1.KeyCtrlA}
 	default:
 		return teav1.KeyMsg{Type: teav1.KeyRunes, Runes: []rune(msg.String())}
 	}
