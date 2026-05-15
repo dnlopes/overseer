@@ -1,0 +1,3 @@
+overseer: load config: config: parse /var/folders/3m/_2lrjwxj2938ywtq34fpnqh40000gn/T/tmp.B4eJCXo238/overseer/config.yaml: yaml: line 1: did not find expected node content: invalid input
+
+exit code: 1

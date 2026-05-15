@@ -1,0 +1,2 @@
+mkdir -p bin
+go build -o bin/overseer ./cmd/overseer/
