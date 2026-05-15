@@ -1,0 +1,11 @@
+total 64
+drwxr-xr-x@ 10 dnl  staff    320 May 16 00:20 .
+drwxr-xr-x   5 dnl  staff    160 May 16 00:19 ..
+drwxr-xr-x@  3 dnl  staff     96 May 16 00:19 .claude-plugin
+-rw-r--r--@  1 dnl  staff    297 May 16 00:19 CHANGELOG.md
+-rw-r--r--@  1 dnl  staff    523 May 16 00:19 DECISIONS.md
+-rw-r--r--@  1 dnl  staff    862 May 16 00:19 README.md
+-rw-r--r--@  1 dnl  staff  13465 May 16 00:20 SKILL.md
+-rw-r--r--@  1 dnl  staff      6 May 16 00:19 VERSION
+drwxr-xr-x@  3 dnl  staff     96 May 16 00:21 references
+drwxr-xr-x@  3 dnl  staff     96 May 16 00:19 tests
