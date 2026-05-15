@@ -1,0 +1,8 @@
+=== RUN   TestReorderUseCase_BoundaryFirst_Up
+--- PASS: TestReorderUseCase_BoundaryFirst_Up (0.00s)
+=== RUN   TestReorderUseCase_BoundaryLast_Down
+--- PASS: TestReorderUseCase_BoundaryLast_Down (0.00s)
+=== RUN   TestReorderUseCase_SingleSession
+--- PASS: TestReorderUseCase_SingleSession (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/service/session	0.193s

@@ -1,0 +1,4 @@
+=== RUN   TestReorderUseCase_MoveDown
+--- PASS: TestReorderUseCase_MoveDown (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/service/session	0.191s
