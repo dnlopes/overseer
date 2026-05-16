@@ -1,0 +1,8 @@
+$ shellcheck scripts/qa-tmux.sh
+
+In scripts/qa-tmux.sh line 3:
+BIN="./bin/overseer"
+^-^ SC2034 (warning): BIN appears unused. Verify use (or export if used externally).
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2034 -- BIN appears unused. Verify use (o...

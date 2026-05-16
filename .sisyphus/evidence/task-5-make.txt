@@ -1,0 +1,13 @@
+$ make -n qa-tmux
+mkdir -p bin
+go build -o bin/overseer ./cmd/overseer/
+mkdir -p .sisyphus/evidence
+bash scripts/qa-tmux.sh
+
+$ make qa-tmux
+mkdir -p bin
+go build -o bin/overseer ./cmd/overseer/
+qa-tmux skeleton OK (no scenarios yet)
+
+$ test -x scripts/qa-tmux.sh
+test -x scripts/qa-tmux.sh OK
