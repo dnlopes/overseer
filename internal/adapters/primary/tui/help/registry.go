@@ -1,8 +1,8 @@
 // Package help provides a keybinding registry and help-bar sub-model that
-// integrates with github.com/charmbracelet/bubbles/help.
+// integrates with charm.land/bubbles/v2/help.
 package help
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // Registry maps pane names to their keybindings plus global bindings shown
 // regardless of which pane is active.

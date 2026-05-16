@@ -1,9 +1,9 @@
 package help
 
 import (
-	bubblehelp "github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
+	bubblehelp "charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 )
 
 // keyMapAdapter wraps a flat []key.Binding to satisfy bubblehelp.KeyMap.
@@ -40,30 +40,37 @@ type Model struct {
 // NewHelpBar returns a Model wired to registry.
 func NewHelpBar(registry *Registry) Model {
 	return Model{
-		help:     bubblehelp.New(),
+		help:     newHelp(),
 		registry: registry,
 		keys:     defaultBarKeys(),
 	}
+}
+
+func newHelp() bubblehelp.Model {
+	h := bubblehelp.New()
+	h.SetWidth(80)
+	h.Styles = bubblehelp.Styles{}
+	return h
 }
 
 func (m Model) Init() tea.Cmd { return nil }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if key.Matches(msg, m.keys.toggleHelp) {
 			m.showFull = !m.showFull
 			m.help.ShowAll = m.showFull
 		}
 	case tea.WindowSizeMsg:
-		m.help.Width = msg.Width
+		m.help.SetWidth(msg.Width)
 	}
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	km := keyMapAdapter{bindings: m.registry.BindingsFor(m.activePane)}
-	return m.help.View(km)
+	return tea.NewView(m.help.View(km))
 }
 
 // SetActivePane updates which pane's bindings appear in the bar.

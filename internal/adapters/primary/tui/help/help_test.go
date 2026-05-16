@@ -5,15 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/lipgloss"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/help"
-	"github.com/muesli/termenv"
+	internalgolden "github.com/dnlopes/overseer/internal/testutil/golden"
 )
 
 func TestMain(m *testing.M) {
-	lipgloss.SetColorProfile(termenv.Ascii)
 	os.Exit(m.Run())
 }
 
@@ -74,7 +72,7 @@ func TestHelp_ActivePaneOnly(t *testing.T) {
 	bar := help.NewHelpBar(reg)
 	bar.SetActivePane("sessions")
 
-	out := bar.View()
+	out := internalgolden.StripANSI(bar.View().Content)
 
 	if !strings.Contains(out, "j") {
 		t.Errorf("expected 'j' in view for sessions pane, got:\n%s", out)
@@ -93,12 +91,12 @@ func TestHelp_Toggle(t *testing.T) {
 	bar := help.NewHelpBar(reg)
 	bar.SetActivePane("sessions")
 
-	shortOut := bar.View()
+	shortOut := internalgolden.StripANSI(bar.View().Content)
 
-	updated, _ := bar.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	updated, _ := bar.Update(tea.KeyPressMsg(tea.Key{Code: '?', Text: "?"}))
 	bar = updated.(help.Model)
 
-	fullOut := bar.View()
+	fullOut := internalgolden.StripANSI(bar.View().Content)
 
 	if shortOut == fullOut {
 		t.Errorf("expected view to change after toggling help\nshort: %q\nfull:  %q", shortOut, fullOut)
