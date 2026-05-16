@@ -62,3 +62,34 @@
 - Added `internal/testutil/golden.RequireEqualColor(t, name, actual)` for golden assertions that preserve ANSI escape sequences under `testdata/golden/color/{name}.golden`.
 - The helper shares the same `-update` flag contract as Charm golden tests and uses atomic writes for updates.
 - Verification evidence captured in `.sisyphus/evidence/task-4-color-diff.txt` and `.sisyphus/evidence/task-4-update.txt`.
+
+## Task 9 — Modal renderer
+
+- `lipgloss.WithWhitespaceBackground` does NOT exist in lipgloss v2.0.0
+- Use `lipgloss.WithWhitespaceStyle(s Style)` instead (takes a full Style, not a color)
+- To keep modal.go free of `lipgloss.NewStyle()` (rule C7), added `Modal.OverlayStyle lipgloss.Style` to `styles.go` — pre-computed as `lipgloss.NewStyle().Background(theme.OverlayBg)`
+- `lipgloss.Place` signature: `Place(width, height int, hPos, vPos Position, str string, opts ...WhitespaceOption) string`
+- Evidence: `.sisyphus/evidence/task-9-modal-tests.txt`, `.sisyphus/evidence/task-9-rule-check.txt`
+
+## Task 13 — help bar theme wiring
+
+- `bubbles/v2/help.Styles` fields: `ShortKey`, `ShortDesc`, `ShortSeparator`, `FullKey`, `FullDesc`, `FullSeparator`, `Ellipsis` (different from v1)
+- `NewHelpBar` signature changed to `(registry *Registry, s *styles.Styles)` — nil-safe for tests
+- Dashboard golden files were stale after previous task re-skins; update with `go test ./... -update`
+- The multiline `bubblehelp.Styles{}` literal doesn't match single-line grep patterns — document this in evidence file
+
+## Tasks 15 & 16 — Re-skin create/rename forms as modals
+
+- Both `create_form.go` and `rename_form.go` now call `components.Modal(m.styles, body, 0, 0)` instead of `m.styles.Form.Container.Render(body)`
+- `Modal(s, body, w, h)` currently ignores `w` and `h` — passes `0, 0` is safe
+- `Modal.Box` has `Padding(1, 3)` vs `Form.Container`'s `Padding(1, 2)` — makes modal 2 columns wider
+- Dashboard golden for `TestDashboard_OpenCreate` needed updating after the padding change
+- Pre-existing dashboard golden staleness (from prior empty-state task) resolved by running `go test ./dashboard/... -update`
+- `xgolden.RequireEqual` golden files live in `internal/adapters/primary/tui/dashboard/testdata/`
+- No goldens exist for create_form or rename_form tests (they use behavioral assertions only)
+
+## Task 20 — tmux QA and ANSI color goldens
+
+- `scripts/qa-tmux.sh` now exercises C9–C12 with isolated tmux sessions and captures evidence under `.sisyphus/evidence/`.
+- Style color goldens live under `internal/adapters/primary/tui/styles/testdata/golden/color/` and preserve ANSI escapes via `golden.RequireEqualColor`.
+- Packages that use `RequireEqualColor` with `-update` need to register the shared `update` flag in test init before running `go test ... -update`.

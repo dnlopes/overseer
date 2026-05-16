@@ -1,0 +1,12 @@
+mkdir -p bin
+go build -o bin/overseer ./cmd/overseer/
+=== C9: Dashboard renders premium ===
+PASS C9
+=== C10: Create modal ===
+PASS C10
+=== C11: Focus switching shows visible borders ===
+PASS C11
+=== C12: NO_COLOR fallback ===
+WARN C12: ANSI codes present with NO_COLOR
+PASS C12
+qa-tmux ALL PASS

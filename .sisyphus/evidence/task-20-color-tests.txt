@@ -1,0 +1,77 @@
+?   	github.com/dnlopes/overseer/cmd/overseer	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/components	0.190s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/dashboard	0.253s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/help	0.366s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/preview	0.484s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/session	0.593s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/status	0.730s [no tests to run]
+=== RUN   TestColorGolden_TitleBarBranding
+--- PASS: TestColorGolden_TitleBarBranding (0.00s)
+=== RUN   TestColorGolden_ListRowSelected
+--- PASS: TestColorGolden_ListRowSelected (0.00s)
+=== RUN   TestColorGolden_StatusSegmentHighlight
+--- PASS: TestColorGolden_StatusSegmentHighlight (0.00s)
+=== RUN   TestColorGolden_HelpKey
+--- PASS: TestColorGolden_HelpKey (0.00s)
+=== RUN   TestDarkTheme_NoZeroColors
+--- PASS: TestDarkTheme_NoZeroColors (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/styles	0.862s
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/titlebar	1.006s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/agent/stub	1.142s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/config/yaml	1.207s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/git/stub	1.208s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/logger/slog	1.209s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/storage/json	1.209s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/secondary/tmux/stub	1.206s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/domain/session	1.128s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/core/service/session	1.119s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/shared/errs	1.074s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/shared/paths	1.055s [no tests to run]
+?   	github.com/dnlopes/overseer/internal/testutil/fixtures	[no test files]
+=== RUN   TestRequireEqualColor_MatchesIdentical
+--- PASS: TestRequireEqualColor_MatchesIdentical (0.00s)
+=== RUN   TestRequireEqualColor_DetectsColorChange
+--- PASS: TestRequireEqualColor_DetectsColorChange (0.00s)
+=== RUN   TestRequireEqualColor_UpdateMode
+--- PASS: TestRequireEqualColor_UpdateMode (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/testutil/golden	1.045s
+?   	github.com/dnlopes/overseer/internal/testutil/mocks	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/dnlopes/overseer/internal/testutil/teatest	0.995s [no tests to run]
