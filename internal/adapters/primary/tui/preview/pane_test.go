@@ -5,16 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	xgolden "github.com/charmbracelet/x/exp/golden"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/preview"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	"github.com/muesli/termenv"
+	internalgolden "github.com/dnlopes/overseer/internal/testutil/golden"
 )
 
 func TestMain(m *testing.M) {
-	lipgloss.SetColorProfile(termenv.Ascii)
 	os.Exit(m.Run())
 }
 
@@ -27,7 +25,7 @@ func newSizedModel(t *testing.T, width, height int) preview.Model {
 
 func TestPreview_Default(t *testing.T) {
 	m := newSizedModel(t, 80, 20)
-	out := m.View()
+	out := internalgolden.StripANSI(m.View().Content)
 	if !strings.Contains(out, "Stub mode: preview not available.") {
 		t.Fatalf("expected stub message in view, got:\n%s", out)
 	}
@@ -37,10 +35,10 @@ func TestPreview_Default(t *testing.T) {
 func TestPreview_FocusedBorder(t *testing.T) {
 	m := newSizedModel(t, 80, 20)
 
-	blurredOut := m.View()
+	blurredOut := internalgolden.StripANSI(m.View().Content)
 
 	m.SetFocus(true)
-	focusedOut := m.View()
+	focusedOut := internalgolden.StripANSI(m.View().Content)
 
 	if focusedOut == blurredOut {
 		t.Error("focused and blurred views should differ")

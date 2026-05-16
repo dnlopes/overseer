@@ -1,9 +1,10 @@
 package preview
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 )
 
@@ -41,8 +42,7 @@ type Model struct {
 
 // New returns a Model with stub content pre-loaded.
 func New(s *styles.Styles) Model {
-	vp := viewport.New(0, 0)
-	vp.HighPerformanceRendering = false
+	vp := viewport.New(viewport.WithWidth(0), viewport.WithHeight(0))
 	vp.SetContent(stubContent)
 
 	return Model{
@@ -59,30 +59,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height
+		border := m.border()
+		m.viewport.SetWidth(max(msg.Width-border.GetHorizontalFrameSize(), 1))
+		m.viewport.SetHeight(max(msg.Height-border.GetVerticalFrameSize(), 1))
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !m.focused {
 			break
 		}
 		switch {
 		case key.Matches(msg, m.keyMap.PageUp):
-			m.viewport.ViewUp()
+			m.viewport.PageUp()
 		case key.Matches(msg, m.keyMap.PageDown):
-			m.viewport.ViewDown()
+			m.viewport.PageDown()
 		}
 	}
 
 	return m, nil
 }
 
-func (m Model) View() string {
-	border := m.styles.Border.Blurred
+func (m Model) View() tea.View {
+	border := m.border()
+	return tea.NewView(border.Render(m.viewport.View()))
+}
+
+func (m Model) border() lipgloss.Style {
 	if m.focused {
-		border = m.styles.Border.Focused
+		return m.styles.Border.Focused
 	}
-	return border.Render(m.viewport.View())
+	return m.styles.Border.Blurred
 }
 
 // SetFocus sets whether the pane receives keyboard input.
