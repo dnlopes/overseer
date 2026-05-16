@@ -56,7 +56,7 @@ func TestDashboard_Default80x24(t *testing.T) {
 	if m.activePane != PaneSessions {
 		t.Fatalf("activePane: want PaneSessions, got %d", m.activePane)
 	}
-	if !strings.Contains(out, "No sessions yet.") {
+	if !strings.Contains(out, "No sessions yet") {
 		t.Fatalf("expected sessions empty state, got:\n%s", out)
 	}
 	if !strings.Contains(out, "Stub mode: preview not available.") {

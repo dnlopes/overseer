@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/google/uuid"
 
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
 	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
@@ -126,9 +127,24 @@ func (m Model) render() string {
 }
 
 func (m Model) renderEmpty() string {
-	title := m.styles.EmptyState.Title.Render("No sessions yet.")
-	hint := m.styles.EmptyState.Hint.Render("Press n to create your first session")
-	return title + "\n" + hint
+	title := m.styles.EmptyState.Title.Render("No sessions yet")
+	hint := components.KeyBadge(m.styles, "n", "create session")
+	content := title + "\n" + hint
+
+	if m.width <= 0 || m.height <= 0 {
+		return content
+	}
+
+	var border lipgloss.Style
+	if m.focused {
+		border = m.styles.Border.Focused
+	} else {
+		border = m.styles.Border.Blurred
+	}
+
+	w := max(m.width-border.GetHorizontalFrameSize(), 1)
+	h := max(m.height-border.GetVerticalFrameSize(), 1)
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, content)
 }
 
 func (m Model) renderGroups() string {

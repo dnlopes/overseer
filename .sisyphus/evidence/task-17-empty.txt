@@ -1,0 +1,40 @@
+╭──────────────────────────────────────────────╮ /Users/dnl/repos/dnlopes/cenas  stubbed  —  idle
+│                                              │╭──────────────────────────────────────────────────────────────────────╮
+│                                              ││ Stub mode: preview not available.                                    │
+│                                              ││                                                                      │
+│                                              ││ This pane will stream the selected session's tmux output when integr │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│               No sessions yet                ││                                                                      │
+│               n  create session              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+╰──────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯
+j move down • k move up • J reorder down • K reorder up • n new session • r rename session • q quit • tab next pane …
