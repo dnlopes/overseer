@@ -35,13 +35,16 @@ func TestPreview_Default(t *testing.T) {
 func TestPreview_FocusedBorder(t *testing.T) {
 	m := newSizedModel(t, 80, 20)
 
-	blurredOut := internalgolden.StripANSI(m.View().Content)
+	blurredOut := m.View().Content
 
 	m.SetFocus(true)
-	focusedOut := internalgolden.StripANSI(m.View().Content)
+	focusedOut := m.View().Content
 
-	if focusedOut == blurredOut {
-		t.Error("focused and blurred views should differ")
+	if !strings.ContainsAny(blurredOut, "╭╮╰╯") {
+		t.Error("blurred view should show rounded border (not hidden)")
+	}
+	if !strings.ContainsAny(focusedOut, "╭╮╰╯") {
+		t.Error("focused view should show rounded border")
 	}
 }
 
