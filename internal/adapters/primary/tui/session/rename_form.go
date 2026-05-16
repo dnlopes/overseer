@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
 	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
@@ -76,5 +77,5 @@ func (m RenameFormModel) View() tea.View {
 		b.WriteString(m.styles.Form.Field.Error.Render(m.errMsg) + "\n")
 	}
 	b.WriteString(m.styles.Help.Description.Render("Enter: submit  Esc: cancel"))
-	return tea.NewView(m.styles.Form.Container.Render(b.String()))
+	return tea.NewView(components.Modal(m.styles, b.String(), 0, 0))
 }
