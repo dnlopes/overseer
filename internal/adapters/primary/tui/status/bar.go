@@ -41,20 +41,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
-	sep := m.styles.Status.Separator.Render()
+	branchSeg := m.styles.StatusSegment.Default.Render(m.branch)
+	prSeg := m.styles.StatusSegment.Default.Render(m.prStatus)
+	agentSeg := m.styles.StatusSegment.Highlight.Render(m.agentStatus)
 
-	trailing := sep +
-		m.styles.Status.Value.Render(m.branch) +
-		sep +
-		m.styles.Status.Value.Render(m.prStatus) +
-		sep +
-		m.styles.Status.Value.Render(m.agentStatus)
+	trailing := branchSeg + prSeg + agentSeg
 
-	available := m.width - lipgloss.Width(trailing)
+	wdSegPadWidth := lipgloss.Width(m.styles.StatusSegment.Default.Render(""))
+	available := m.width - lipgloss.Width(trailing) - wdSegPadWidth
 	available = max(available, 0)
 
 	wd := truncate(m.workdir, available)
-	return tea.NewView(m.styles.Status.Value.Render(wd) + trailing)
+	wdSeg := m.styles.StatusSegment.Default.Render(wd)
+
+	return tea.NewView(wdSeg + trailing)
 }
 
 func truncate(s string, maxWidth int) string {
