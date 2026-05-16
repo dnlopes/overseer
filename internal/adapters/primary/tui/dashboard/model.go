@@ -12,6 +12,7 @@ import (
 	sessionui "github.com/dnlopes/overseer/internal/adapters/primary/tui/session"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/status"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/titlebar"
 	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
 )
 
@@ -23,6 +24,7 @@ const (
 )
 
 type Model struct {
+	titlebar     titlebar.Model
 	sessionsList sessionui.Model
 	statusBar    status.Model
 	previewPane  preview.Model
@@ -52,6 +54,9 @@ func New(
 		registry = help.NewRegistry()
 	}
 
+	tb := titlebar.New(s, "Overseer")
+	tbModel, _ := tb.Update(titlebar.SetActivePaneMsg{Label: "Sessions"})
+
 	sl := sessionui.New(s, listUC)
 	sb := status.New(s)
 	pp := preview.New(s)
@@ -67,6 +72,7 @@ func New(
 	hb.SetActivePane("sessions")
 
 	return Model{
+		titlebar:     tbModel.(titlebar.Model),
 		sessionsList: sl,
 		statusBar:    sb,
 		previewPane:  pp,
@@ -84,6 +90,7 @@ func New(
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
+		m.titlebar.Init(),
 		m.sessionsList.Init(),
 		m.statusBar.Init(),
 		m.previewPane.Init(),
@@ -128,12 +135,17 @@ func (m Model) View() tea.View {
 		return tea.NewView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, msg))
 	}
 
+	titlebarView := m.viewString(m.titlebar.View())
+	titlebarHeight := lipgloss.Height(titlebarView)
+	if titlebarHeight < 1 {
+		titlebarHeight = 1
+	}
 	leftWidth := m.width * 40 / 100
 	rightWidth := m.width - leftWidth
 	helpView := m.viewString(m.helpBar.View())
 	helpHeight := lipgloss.Height(helpView)
 	helpHeight = max(helpHeight, 1)
-	bodyHeight := m.height - helpHeight
+	bodyHeight := m.height - titlebarHeight - helpHeight
 	bodyHeight = max(bodyHeight, 1)
 
 	left := fit(m.viewString(m.sessionsList.View()), leftWidth, bodyHeight)
@@ -145,7 +157,7 @@ func (m Model) View() tea.View {
 		fit(m.viewString(m.previewPane.View()), rightWidth, previewHeight),
 	)
 	body := fit(lipgloss.JoinHorizontal(lipgloss.Top, left, right), m.width, bodyHeight)
-	full := lipgloss.JoinVertical(lipgloss.Left, body, helpView)
+	full := lipgloss.JoinVertical(lipgloss.Left, titlebarView, body, helpView)
 
 	if m.createForm != nil {
 		return tea.NewView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.viewString(m.createForm.View())))
@@ -164,14 +176,23 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	leftWidth := m.width * 40 / 100
 	rightWidth := m.width - leftWidth
-	bodyHeight := m.height - 1
+
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
+	m.titlebar, cmd = updateModel(m.titlebar, tea.WindowSizeMsg{Width: m.width, Height: 1})
+	cmds = append(cmds, cmd)
+
+	titlebarHeight := lipgloss.Height(m.viewString(m.titlebar.View()))
+	if titlebarHeight < 1 {
+		titlebarHeight = 1
+	}
+	bodyHeight := m.height - titlebarHeight - 1
 	bodyHeight = max(bodyHeight, 1)
 	statusHeight := 1
 	previewHeight := bodyHeight - statusHeight
 	previewHeight = max(previewHeight, 1)
 
-	var cmds []tea.Cmd
-	var cmd tea.Cmd
 	m.sessionsList, cmd = updateModel(m.sessionsList, tea.WindowSizeMsg{Width: leftWidth, Height: bodyHeight})
 	cmds = append(cmds, cmd)
 	m.statusBar, cmd = updateModel(m.statusBar, tea.WindowSizeMsg{Width: rightWidth, Height: statusHeight})
@@ -245,9 +266,11 @@ func (m *Model) focus(p Pane) {
 	m.previewPane.SetFocus(p == PanePreview)
 	if p == PaneSessions {
 		m.helpBar.SetActivePane("sessions")
+		m.titlebar, _ = updateModel(m.titlebar, titlebar.SetActivePaneMsg{Label: "Sessions"})
 		return
 	}
 	m.helpBar.SetActivePane("preview")
+	m.titlebar, _ = updateModel(m.titlebar, titlebar.SetActivePaneMsg{Label: "Preview"})
 }
 
 func (m Model) routeToActivePane(msg tea.Msg) (tea.Model, tea.Cmd) {

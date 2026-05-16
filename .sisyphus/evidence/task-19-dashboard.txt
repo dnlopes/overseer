@@ -1,0 +1,40 @@
+ Overseer                                                                                                      Sessions
+╭──────────────────────────────────────────────╮ /Users/dnl/repos/dnlopes/cenas  stubbed  —  idle
+│0                                             │╭──────────────────────────────────────────────────────────────────────╮
+│asdasdasd                                     ││ Stub mode: preview not available.                                    │
+│adeus                                         ││                                                                      │
+│ola                                           ││ This pane will stream the selected session's tmux output when integr │
+│adeus asd                                     ││                                                                      │
+│ola                                           ││                                                                      │
+│asd                                           ││                                                                      │
+│asd                                           ││                                                                      │
+│DavidspaceLopes                               ││                                                                      │
+│cenas maradas                                 ││                                                                      │
+│asdasdasdasd                                  ││                                                                      │
+│asdasdasdsadasdad                             ││                                                                      │
+│123asd                                        ││                                                                      │
+│asd asd                                       ││                                                                      │
+│asd                                           ││                                                                      │
+│asdasd                                        ││                                                                      │
+│asd                                           ││                                                                      │
+│asdasdasd                                     ││                                                                      │
+│aa                                            ││                                                                      │
+│marado                                        ││                                                                      │
+│teste                                         ││                                                                      │
+│project                                       ││                                                                      │
+│test                                          ││                                                                      │
+│test-project                                  ││                                                                      │
+│test-session                                  ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+│                                              ││                                                                      │
+╰──────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯
+j move down • k move up • J reorder down • K reorder up • n new session • r rename session • q quit • tab next pane …
