@@ -1,0 +1,16 @@
+## go test ./internal/testutil/golden/... -v
+=== RUN   TestRequireEqualColor_MatchesIdentical
+--- PASS: TestRequireEqualColor_MatchesIdentical (0.00s)
+=== RUN   TestRequireEqualColor_DetectsColorChange
+--- PASS: TestRequireEqualColor_DetectsColorChange (0.00s)
+=== RUN   TestRequireEqualColor_UpdateMode
+--- PASS: TestRequireEqualColor_UpdateMode (0.00s)
+=== RUN   TestSetupStripsANSI
+--- PASS: TestSetupStripsANSI (0.00s)
+=== RUN   TestReadBts
+--- PASS: TestReadBts (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/testutil/golden	(cached)
+
+## grep -n "func RequireEqualColor" internal/testutil/golden/color.go
+20:func RequireEqualColor(t testing.TB, name string, actual string) {
