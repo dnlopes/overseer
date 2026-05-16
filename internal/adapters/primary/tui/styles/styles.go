@@ -83,8 +83,9 @@ type Styles struct {
 	}
 	Form       FormStyles
 	Modal      struct {
-		Box     lipgloss.Style
-		Overlay color.Color
+		Box          lipgloss.Style
+		Overlay      color.Color
+		OverlayStyle lipgloss.Style
 	}
 	Badge      struct {
 		Key   lipgloss.Style
@@ -166,8 +167,9 @@ func New() *Styles {
 			},
 		},
 		Modal: struct {
-			Box     lipgloss.Style
-			Overlay color.Color
+			Box          lipgloss.Style
+			Overlay      color.Color
+			OverlayStyle lipgloss.Style
 		}{
 			Box: lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
@@ -175,7 +177,8 @@ func New() *Styles {
 				Background(theme.ModalBg).
 				Foreground(theme.Text).
 				Padding(1, 3),
-			Overlay: theme.OverlayBg,
+			Overlay:      theme.OverlayBg,
+			OverlayStyle: lipgloss.NewStyle().Background(theme.OverlayBg),
 		},
 		Badge: struct {
 			Key   lipgloss.Style

@@ -1,0 +1,8 @@
+=== RUN   TestModal_CentersContent
+--- PASS: TestModal_CentersContent (0.00s)
+=== RUN   TestModal_HasRoundedBorder
+--- PASS: TestModal_HasRoundedBorder (0.00s)
+=== RUN   TestModal_OverlayBackground
+--- PASS: TestModal_OverlayBackground (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/components	0.184s
