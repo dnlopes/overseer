@@ -69,7 +69,7 @@ func TestHelp_ActivePaneOnly(t *testing.T) {
 		key.NewBinding(key.WithKeys("pgup"), key.WithHelp("pgup", "scroll up")),
 	})
 
-	bar := help.NewHelpBar(reg)
+	bar := help.NewHelpBar(reg, nil)
 	bar.SetActivePane("sessions")
 
 	out := internalgolden.StripANSI(bar.View().Content)
@@ -88,7 +88,7 @@ func TestHelp_Toggle(t *testing.T) {
 		key.NewBinding(key.WithKeys("j"), key.WithHelp("j", "down")),
 	})
 
-	bar := help.NewHelpBar(reg)
+	bar := help.NewHelpBar(reg, nil)
 	bar.SetActivePane("sessions")
 
 	shortOut := internalgolden.StripANSI(bar.View().Content)

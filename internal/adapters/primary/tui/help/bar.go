@@ -4,6 +4,8 @@ import (
 	bubblehelp "charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 )
 
 // keyMapAdapter wraps a flat []key.Binding to satisfy bubblehelp.KeyMap.
@@ -37,19 +39,29 @@ type Model struct {
 	keys       barKeys
 }
 
-// NewHelpBar returns a Model wired to registry.
-func NewHelpBar(registry *Registry) Model {
+// NewHelpBar returns a Model wired to registry, styled from s.
+func NewHelpBar(registry *Registry, s *styles.Styles) Model {
 	return Model{
-		help:     newHelp(),
+		help:     newHelp(s),
 		registry: registry,
 		keys:     defaultBarKeys(),
 	}
 }
 
-func newHelp() bubblehelp.Model {
+func newHelp(s *styles.Styles) bubblehelp.Model {
 	h := bubblehelp.New()
 	h.SetWidth(80)
-	h.Styles = bubblehelp.Styles{}
+	if s != nil {
+		h.Styles = bubblehelp.Styles{
+			ShortKey:       s.Help.Key,
+			ShortDesc:      s.Help.Description,
+			ShortSeparator: s.Help.Separator,
+			FullKey:        s.Help.Key,
+			FullDesc:       s.Help.Description,
+			FullSeparator:  s.Help.Separator,
+			Ellipsis:       s.Help.Separator,
+		}
+	}
 	return h
 }
 

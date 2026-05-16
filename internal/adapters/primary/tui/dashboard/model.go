@@ -55,7 +55,7 @@ func New(
 	sl := sessionui.New(s, listUC)
 	sb := status.New(s)
 	pp := preview.New(s)
-	hb := help.NewHelpBar(registry)
+	hb := help.NewHelpBar(registry, s)
 
 	registry.RegisterPane("sessions", append(sl.Keybindings(),
 		key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new session")),

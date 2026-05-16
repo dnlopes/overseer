@@ -1,0 +1,16 @@
+# Grep for help.Styles assignment (task spec pattern)
+# Alternate: multiline struct literal (actual code)
+55:		h.Styles = bubblehelp.Styles{
+# Context lines 54-65 showing populated struct:
+	if s != nil {
+		h.Styles = bubblehelp.Styles{
+			ShortKey:       s.Help.Key,
+			ShortDesc:      s.Help.Description,
+			ShortSeparator: s.Help.Separator,
+			FullKey:        s.Help.Key,
+			FullDesc:       s.Help.Description,
+			FullSeparator:  s.Help.Separator,
+			Ellipsis:       s.Help.Separator,
+		}
+	}
+	return h
