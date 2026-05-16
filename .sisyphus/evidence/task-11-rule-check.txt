@@ -1,0 +1,7 @@
+# Task 11: Rule Check - No lipgloss.NewStyle/lipgloss.Color in divider.go
+
+Command: grep -n 'lipgloss.NewStyle\|lipgloss.Color' internal/adapters/primary/tui/components/divider.go
+Result: (no output - zero matches)
+Exit code: 1 (grep convention: no matches = exit 1)
+
+PASS: Rule C7 satisfied — divider.go contains zero direct lipgloss style calls.
