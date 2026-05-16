@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/lipgloss/v2"
+	"github.com/google/uuid"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
@@ -14,8 +15,10 @@ import (
 )
 
 type groupsLoadedMsg struct {
-	groups []servicesession.SessionGroup
-	err    error
+	groups         []servicesession.SessionGroup
+	err            error
+	selectedID     uuid.UUID
+	preserveCursor bool
 }
 
 type ReorderRequestMsg struct {
@@ -63,7 +66,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case groupsLoadedMsg:
 		if msg.err == nil {
 			m.groups = msg.groups
-			m.cursor = 0
+			if msg.preserveCursor {
+				m.cursor = m.indexOf(msg.selectedID)
+			} else {
+				m.cursor = 0
+			}
 		}
 
 	case tea.KeyPressMsg:
@@ -104,6 +111,16 @@ func (m Model) render() string {
 		border = m.styles.Border.Focused
 	} else {
 		border = m.styles.Border.Blurred
+	}
+	if m.width > 0 {
+		contentWidth := m.width - border.GetHorizontalFrameSize()
+		contentWidth = max(contentWidth, 1)
+		content = lipgloss.NewStyle().Width(contentWidth).Render(content)
+	}
+	if m.height > 0 {
+		contentHeight := m.height - border.GetVerticalFrameSize()
+		contentHeight = max(contentHeight, 1)
+		content = lipgloss.NewStyle().Height(contentHeight).Render(content)
 	}
 	return border.Render(content)
 }
@@ -159,6 +176,39 @@ func (m Model) SelectedSession() (domainsession.Session, bool) {
 		}
 	}
 	return domainsession.Session{}, false
+}
+
+func (m Model) Cursor() int {
+	return m.cursor
+}
+
+func (m Model) ReloadPreservingSelection(id uuid.UUID) tea.Cmd {
+	if m.listUC == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		resp, err := m.listUC.Execute(context.Background(), servicesession.ListRequest{})
+		if err != nil {
+			return groupsLoadedMsg{err: err, selectedID: id, preserveCursor: true}
+		}
+		return groupsLoadedMsg{groups: resp.Groups, selectedID: id, preserveCursor: true}
+	}
+}
+
+func (m Model) indexOf(id uuid.UUID) int {
+	flatIdx := 0
+	for _, g := range m.groups {
+		for _, s := range g.Sessions {
+			if s.ID == id {
+				return flatIdx
+			}
+			flatIdx++
+		}
+	}
+	if total := m.totalItems(); total > 0 && m.cursor >= total {
+		return total - 1
+	}
+	return m.cursor
 }
 
 func (m Model) Keybindings() []key.Binding {

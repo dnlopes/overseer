@@ -37,13 +37,13 @@ func twoGroupsModel() Model {
 func TestList_Empty(t *testing.T) {
 	internalgolden.Setup(t)
 	m := New(styles.New(), nil)
-	xgolden.RequireEqual(t, []byte(m.render()))
+	xgolden.RequireEqual(t, []byte(internalgolden.StripANSI(m.render())))
 }
 
 func TestList_TwoGroups(t *testing.T) {
 	internalgolden.Setup(t)
 	m := twoGroupsModel()
-	xgolden.RequireEqual(t, []byte(m.render()))
+	xgolden.RequireEqual(t, []byte(internalgolden.StripANSI(m.render())))
 }
 
 func TestList_CursorDown(t *testing.T) {
