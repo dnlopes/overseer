@@ -1,0 +1,4 @@
+=== RUN   TestDarkTheme_NoZeroColors
+--- PASS: TestDarkTheme_NoZeroColors (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/styles	0.181s

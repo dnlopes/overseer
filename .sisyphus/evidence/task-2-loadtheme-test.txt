@@ -1,0 +1,6 @@
+=== RUN   TestLoadTheme_DefaultsToDark
+--- PASS: TestLoadTheme_DefaultsToDark (0.00s)
+=== RUN   TestLoadTheme_Dark
+--- PASS: TestLoadTheme_Dark (0.00s)
+PASS
+ok  	github.com/dnlopes/overseer/internal/adapters/primary/tui/styles	0.181s
