@@ -9,9 +9,8 @@ import (
 	teatestv2 "github.com/charmbracelet/x/exp/teatest/v2"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
-	internalteatest "github.com/dnlopes/overseer/internal/testutil/teatest"
-	internalgolden "github.com/dnlopes/overseer/internal/testutil/golden"
+	"github.com/dnlopes/overseer/internal/core/domain"
+	"github.com/dnlopes/overseer/internal/testutil"
 )
 
 func twoGroupsModel() Model {
@@ -19,13 +18,13 @@ func twoGroupsModel() Model {
 	m.groups = []SessionGroup{
 		{
 			ProjectName: "alpha",
-			Sessions: []domainsession.Session{
+			Sessions: []domain.Session{
 				{Name: "session-one"},
 			},
 		},
 		{
 			ProjectName: "beta",
-			Sessions: []domainsession.Session{
+			Sessions: []domain.Session{
 				{Name: "session-two"},
 				{Name: "session-three"},
 			},
@@ -35,15 +34,15 @@ func twoGroupsModel() Model {
 }
 
 func TestList_Empty(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := New(styles.New(), nil)
-	xgolden.RequireEqual(t, []byte(internalgolden.StripANSI(m.render())))
+	xgolden.RequireEqual(t, []byte(testutil.StripANSI(m.render())))
 }
 
 func TestList_TwoGroups(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := twoGroupsModel()
-	xgolden.RequireEqual(t, []byte(internalgolden.StripANSI(m.render())))
+	xgolden.RequireEqual(t, []byte(testutil.StripANSI(m.render())))
 }
 
 func TestList_CursorDown(t *testing.T) {
@@ -58,10 +57,10 @@ func TestList_CursorDown(t *testing.T) {
 }
 
 func TestList_CursorDownViaHarness(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := twoGroupsModel()
 
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 	tm.Type("j")
 	tm.Type("j")
 
@@ -111,7 +110,7 @@ func TestList_CursorUp(t *testing.T) {
 }
 
 func TestList_FocusedBorder(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := twoGroupsModel()
 	m.SetFocus(true)
 

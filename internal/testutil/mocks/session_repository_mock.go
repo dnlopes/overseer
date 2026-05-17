@@ -5,38 +5,38 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/dnlopes/overseer/internal/core/domain/session"
+	"github.com/dnlopes/overseer/internal/core/domain"
 )
 
 type MockSessionRepository struct {
 	SaveCalls    int
 	SaveErr      error
-	SavedSession session.Session
+	SavedSession domain.Session
 
 	ListCalls  int
-	ListResult []session.Session
+	ListResult []domain.Session
 	ListErr    error
 
 	GetCalls  int
-	GetResult session.Session
+	GetResult domain.Session
 	GetErr    error
 
 	DeleteCalls int
 	DeleteErr   error
 }
 
-func (m *MockSessionRepository) Save(ctx context.Context, s session.Session) error {
+func (m *MockSessionRepository) Save(ctx context.Context, s domain.Session) error {
 	m.SaveCalls++
 	m.SavedSession = s
 	return m.SaveErr
 }
 
-func (m *MockSessionRepository) Get(ctx context.Context, id uuid.UUID) (session.Session, error) {
+func (m *MockSessionRepository) Get(ctx context.Context, id uuid.UUID) (domain.Session, error) {
 	m.GetCalls++
 	return m.GetResult, m.GetErr
 }
 
-func (m *MockSessionRepository) List(ctx context.Context) ([]session.Session, error) {
+func (m *MockSessionRepository) List(ctx context.Context) ([]domain.Session, error) {
 	m.ListCalls++
 	return m.ListResult, m.ListErr
 }

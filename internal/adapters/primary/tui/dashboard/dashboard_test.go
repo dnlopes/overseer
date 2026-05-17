@@ -10,10 +10,8 @@ import (
 	xgolden "github.com/charmbracelet/x/exp/golden"
 	teatestv2 "github.com/charmbracelet/x/exp/teatest/v2"
 
-	"github.com/dnlopes/overseer/internal/adapters/primary/tui/help"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	internalgolden "github.com/dnlopes/overseer/internal/testutil/golden"
-	internalteatest "github.com/dnlopes/overseer/internal/testutil/teatest"
+	"github.com/dnlopes/overseer/internal/testutil"
 )
 
 func TestMain(m *testing.M) {
@@ -21,7 +19,7 @@ func TestMain(m *testing.M) {
 }
 
 func newDashboard() Model {
-	return New(styles.New(), nil, nil, nil, nil, help.NewRegistry())
+	return New(styles.New(), nil, NewHelpRegistry())
 }
 
 func sizedDashboard(t *testing.T, width, height int) Model {
@@ -32,7 +30,7 @@ func sizedDashboard(t *testing.T, width, height int) Model {
 }
 
 func viewString(m Model) string {
-	return internalgolden.StripANSI(m.viewString(m.View()))
+	return testutil.StripANSI(m.viewString(m.View()))
 }
 
 func keyMsg(text string) tea.KeyPressMsg {
@@ -49,7 +47,7 @@ func keyMsg(text string) tea.KeyPressMsg {
 }
 
 func TestDashboard_Default80x24(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := sizedDashboard(t, 80, 24)
 	out := viewString(m)
 
@@ -66,13 +64,13 @@ func TestDashboard_Default80x24(t *testing.T) {
 }
 
 func TestDashboard_SessionsFocused(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := sizedDashboard(t, 80, 24)
 	xgolden.RequireEqual(t, []byte(viewString(m)))
 }
 
 func TestDashboard_PreviewFocused(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := sizedDashboard(t, 80, 24)
 	updated, _ := m.Update(keyMsg("tab"))
 	m = updated.(Model)
@@ -103,7 +101,7 @@ func TestDashboard_TabCyclesFocus(t *testing.T) {
 }
 
 func TestDashboard_OpenCreate(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := sizedDashboard(t, 80, 24)
 
 	updated, _ := m.Update(keyMsg("n"))
@@ -119,7 +117,7 @@ func TestDashboard_OpenCreate(t *testing.T) {
 }
 
 func TestDashboard_TooSmall(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 	m := sizedDashboard(t, 40, 10)
 	out := viewString(m)
 
@@ -185,7 +183,7 @@ func TestDashboard_RWithNoSession(t *testing.T) {
 
 func TestDashboard_DefaultViaHarness(t *testing.T) {
 	m := newDashboard()
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	teatestv2.WaitFor(t, tm.Output(), func(b []byte) bool {
 		return strings.Contains(string(b), "j move down")

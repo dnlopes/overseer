@@ -14,51 +14,48 @@ import (
 	teatestv2 "github.com/charmbracelet/x/exp/teatest/v2"
 	"github.com/google/uuid"
 
-	"github.com/dnlopes/overseer/internal/adapters/primary/tui/help"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
-	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
-	"github.com/dnlopes/overseer/internal/testutil/fixtures"
-	internalgolden "github.com/dnlopes/overseer/internal/testutil/golden"
-	internalteatest "github.com/dnlopes/overseer/internal/testutil/teatest"
+	"github.com/dnlopes/overseer/internal/core/domain"
+	"github.com/dnlopes/overseer/internal/core/service"
+	"github.com/dnlopes/overseer/internal/testutil"
 )
 
 // inMemoryRepo is a thread-safe stateful repository. Unlike MockSessionRepository,
 // it persists saved sessions across List/Get calls, enabling full CRUD flows.
 type inMemoryRepo struct {
 	mu       sync.Mutex
-	sessions map[uuid.UUID]domainsession.Session
+	sessions map[uuid.UUID]domain.Session
 }
 
-func newInMemoryRepo(seeds ...domainsession.Session) *inMemoryRepo {
-	r := &inMemoryRepo{sessions: make(map[uuid.UUID]domainsession.Session)}
+func newInMemoryRepo(seeds ...domain.Session) *inMemoryRepo {
+	r := &inMemoryRepo{sessions: make(map[uuid.UUID]domain.Session)}
 	for _, s := range seeds {
 		r.sessions[s.ID] = s
 	}
 	return r
 }
 
-func (r *inMemoryRepo) Save(_ context.Context, s domainsession.Session) error {
+func (r *inMemoryRepo) Save(_ context.Context, s domain.Session) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.sessions[s.ID] = s
 	return nil
 }
 
-func (r *inMemoryRepo) Get(_ context.Context, id uuid.UUID) (domainsession.Session, error) {
+func (r *inMemoryRepo) Get(_ context.Context, id uuid.UUID) (domain.Session, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	s, ok := r.sessions[id]
 	if !ok {
-		return domainsession.Session{}, domainsession.ErrNotFound
+		return domain.Session{}, domain.ErrSessionNotFound
 	}
 	return s, nil
 }
 
-func (r *inMemoryRepo) List(_ context.Context) ([]domainsession.Session, error) {
+func (r *inMemoryRepo) List(_ context.Context) ([]domain.Session, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	result := make([]domainsession.Session, 0, len(r.sessions))
+	result := make([]domain.Session, 0, len(r.sessions))
 	for _, s := range r.sessions {
 		result = append(result, s)
 	}
@@ -86,13 +83,9 @@ func e2eLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func buildE2EModel(repo domainsession.Repository) Model {
-	log := e2eLogger()
-	createUC := servicesession.NewCreateUseCase(repo, &e2eTmux{}, &e2eGit{}, log)
-	renameUC := servicesession.NewRenameUseCase(repo, log)
-	reorderUC := servicesession.NewReorderUseCase(repo, log)
-	listUC := servicesession.NewListUseCase(repo)
-	return New(styles.New(), createUC, renameUC, reorderUC, listUC, help.NewRegistry())
+func buildE2EModel(repo domain.SessionRepository) Model {
+	svc := service.NewSessionService(repo, &e2eTmux{}, &e2eGit{}, e2eLogger())
+	return New(styles.New(), svc, NewHelpRegistry())
 }
 
 func e2eKey(text string) tea.KeyPressMsg {
@@ -129,11 +122,11 @@ func readFinalOutput(t *testing.T, tm *teatestv2.TestModel) []byte {
 }
 
 func TestE2E_CreateFlow(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
 	repo := newInMemoryRepo()
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -161,11 +154,11 @@ func TestE2E_CreateFlow(t *testing.T) {
 }
 
 func TestE2E_CreateFlowWithReturnKey(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
 	repo := newInMemoryRepo()
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -193,11 +186,11 @@ func TestE2E_CreateFlowWithReturnKey(t *testing.T) {
 }
 
 func TestE2E_CreateFlowEmptyProjectShowsErrorWithLineFeed(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
 	repo := newInMemoryRepo()
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -224,11 +217,11 @@ func TestE2E_CreateFlowEmptyProjectShowsErrorWithLineFeed(t *testing.T) {
 }
 
 func TestE2E_CreateFlowEmptyNameShowsErrorWithCtrlJ(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
 	repo := newInMemoryRepo()
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -254,12 +247,12 @@ func TestE2E_CreateFlowEmptyNameShowsErrorWithCtrlJ(t *testing.T) {
 }
 
 func TestE2E_RenameFlow(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
-	seed := fixtures.MakeSession("original", "proj")
+	seed := testutil.MakeSession("original", "proj")
 	repo := newInMemoryRepo(seed)
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -286,17 +279,17 @@ func TestE2E_RenameFlow(t *testing.T) {
 }
 
 func TestE2E_ReorderFlow(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
-	s1 := fixtures.MakeSession("sess-1", "myproject")
+	s1 := testutil.MakeSession("sess-1", "myproject")
 	s1.Order = 1
-	s2 := fixtures.MakeSession("sess-2", "myproject")
+	s2 := testutil.MakeSession("sess-2", "myproject")
 	s2.Order = 2
-	s3 := fixtures.MakeSession("sess-3", "myproject")
+	s3 := testutil.MakeSession("sess-3", "myproject")
 	s3.Order = 3
 	repo := newInMemoryRepo(s1, s2, s3)
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -332,11 +325,11 @@ func TestE2E_ReorderFlow(t *testing.T) {
 }
 
 func TestE2E_FocusCycling(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
 	repo := newInMemoryRepo()
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -356,11 +349,11 @@ func TestE2E_FocusCycling(t *testing.T) {
 }
 
 func TestE2E_QuitCleanly(t *testing.T) {
-	internalgolden.Setup(t)
+	testutil.Setup(t)
 
 	repo := newInMemoryRepo()
 	m := buildE2EModel(repo)
-	tm := internalteatest.NewHarness(t, m, 80, 24)
+	tm := testutil.NewHarness(t, m, 80, 24)
 
 	time.Sleep(100 * time.Millisecond)
 

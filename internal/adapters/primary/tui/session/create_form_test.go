@@ -9,22 +9,22 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
-	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
+	"github.com/dnlopes/overseer/internal/core/domain"
+	"github.com/dnlopes/overseer/internal/core/service"
 	"github.com/dnlopes/overseer/internal/testutil/mocks"
 )
 
-func newCreateFormUseCase(sessions []domainsession.Session) *servicesession.CreateUseCase {
+func newCreateFormService(sessions []domain.Session) *service.SessionService {
 	repo := &mocks.MockSessionRepository{ListResult: sessions}
 	tmux := &mocks.MockTmuxAdapter{}
 	git := &mocks.MockGitAdapter{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return servicesession.NewCreateUseCase(repo, tmux, git, logger)
+	return service.NewSessionService(repo, tmux, git, logger)
 }
 
 func newCreateFormFixture() CreateFormModel {
-	uc := newCreateFormUseCase([]domainsession.Session{})
-	return NewCreateForm(styles.New(), uc)
+	svc := newCreateFormService([]domain.Session{})
+	return NewCreateForm(styles.New(), svc)
 }
 
 func TestCreateForm_HappyPath(t *testing.T) {

@@ -9,19 +9,19 @@ import (
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
-	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
+	"github.com/dnlopes/overseer/internal/core/domain"
+	"github.com/dnlopes/overseer/internal/core/service"
 )
 
 type RenameFormModel struct {
 	nameInput      textinput.Model
 	errMsg         string
-	currentSession domainsession.Session
-	renameUC       *servicesession.RenameUseCase
+	currentSession domain.Session
+	svc            *service.SessionService
 	styles         *styles.Styles
 }
 
-func NewRenameForm(s *styles.Styles, renameUC *servicesession.RenameUseCase, current domainsession.Session) RenameFormModel {
+func NewRenameForm(s *styles.Styles, svc *service.SessionService, current domain.Session) RenameFormModel {
 	ti := textinput.New()
 	ti.CharLimit = 100
 	ti.SetWidth(36)
@@ -33,7 +33,7 @@ func NewRenameForm(s *styles.Styles, renameUC *servicesession.RenameUseCase, cur
 	return RenameFormModel{
 		nameInput:      ti,
 		currentSession: current,
-		renameUC:       renameUC,
+		svc:            svc,
 		styles:         s,
 	}
 }
@@ -52,7 +52,7 @@ func (m RenameFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errMsg = "name cannot be empty"
 				return m, nil
 			}
-			resp, err := m.renameUC.Execute(context.Background(), servicesession.RenameRequest{
+			resp, err := m.svc.Rename(context.Background(), service.RenameSessionRequest{
 				ID:      m.currentSession.ID,
 				NewName: name,
 			})

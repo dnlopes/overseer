@@ -9,7 +9,7 @@ import (
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
+	"github.com/dnlopes/overseer/internal/core/service"
 )
 
 type CreateFormModel struct {
@@ -17,11 +17,11 @@ type CreateFormModel struct {
 	projectInput textinput.Model
 	focusIndex   int
 	errMsg       string
-	createUC     *servicesession.CreateUseCase
+	svc          *service.SessionService
 	styles       *styles.Styles
 }
 
-func NewCreateForm(s *styles.Styles, createUC *servicesession.CreateUseCase) CreateFormModel {
+func NewCreateForm(s *styles.Styles, svc *service.SessionService) CreateFormModel {
 	nameInput := textinput.New()
 	nameInput.Placeholder = "Session name"
 	nameInput.CharLimit = 100
@@ -41,7 +41,7 @@ func NewCreateForm(s *styles.Styles, createUC *servicesession.CreateUseCase) Cre
 		nameInput:    nameInput,
 		projectInput: projectInput,
 		focusIndex:   0,
-		createUC:     createUC,
+		svc:          svc,
 		styles:       s,
 	}
 }
@@ -97,10 +97,10 @@ func (m CreateFormModel) submit() (tea.Model, tea.Cmd) {
 	}
 
 	m.errMsg = ""
-	uc := m.createUC
-	req := servicesession.CreateRequest{Name: name, ProjectName: project}
+	svc := m.svc
+	req := service.CreateSessionRequest{Name: name, ProjectName: project}
 	return m, func() tea.Msg {
-		resp, err := uc.Execute(context.Background(), req)
+		resp, err := svc.Create(context.Background(), req)
 		if err != nil {
 			return createErrMsg{err: err}
 		}

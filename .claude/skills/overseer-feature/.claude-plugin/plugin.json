@@ -1,6 +1,0 @@
-{
-  "name": "overseer-feature",
-  "version": "1.0.0",
-  "description": "Skill for adding new features to the Overseer TUI application following hexagonal architecture",
-  "skills": ["overseer-feature"]
-}

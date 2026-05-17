@@ -11,12 +11,12 @@ import (
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
-	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
+	"github.com/dnlopes/overseer/internal/core/domain"
+	"github.com/dnlopes/overseer/internal/core/service"
 )
 
 type groupsLoadedMsg struct {
-	groups         []servicesession.SessionGroup
+	groups         []service.SessionGroup
 	err            error
 	selectedID     uuid.UUID
 	preserveCursor bool
@@ -26,7 +26,7 @@ type ReorderRequestMsg struct {
 	Direction int
 }
 
-type SessionGroup = servicesession.SessionGroup
+type SessionGroup = service.SessionGroup
 
 type Model struct {
 	groups  []SessionGroup
@@ -35,22 +35,22 @@ type Model struct {
 	focused bool
 	width   int
 	height  int
-	listUC  *servicesession.ListUseCase
+	svc     *service.SessionService
 }
 
-func New(s *styles.Styles, listUC *servicesession.ListUseCase) Model {
+func New(s *styles.Styles, svc *service.SessionService) Model {
 	return Model{
 		styles: s,
-		listUC: listUC,
+		svc:    svc,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	if m.listUC == nil {
+	if m.svc == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		resp, err := m.listUC.Execute(context.Background(), servicesession.ListRequest{})
+		resp, err := m.svc.List(context.Background(), service.ListSessionsRequest{})
 		if err != nil {
 			return groupsLoadedMsg{err: err}
 		}
@@ -178,9 +178,9 @@ func (m *Model) SetFocus(focused bool) {
 	m.focused = focused
 }
 
-func (m Model) SelectedSession() (domainsession.Session, bool) {
+func (m Model) SelectedSession() (domain.Session, bool) {
 	if m.totalItems() == 0 {
-		return domainsession.Session{}, false
+		return domain.Session{}, false
 	}
 	flatIdx := 0
 	for _, g := range m.groups {
@@ -191,7 +191,7 @@ func (m Model) SelectedSession() (domainsession.Session, bool) {
 			flatIdx++
 		}
 	}
-	return domainsession.Session{}, false
+	return domain.Session{}, false
 }
 
 func (m Model) Cursor() int {
@@ -199,11 +199,11 @@ func (m Model) Cursor() int {
 }
 
 func (m Model) ReloadPreservingSelection(id uuid.UUID) tea.Cmd {
-	if m.listUC == nil {
+	if m.svc == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		resp, err := m.listUC.Execute(context.Background(), servicesession.ListRequest{})
+		resp, err := m.svc.List(context.Background(), service.ListSessionsRequest{})
 		if err != nil {
 			return groupsLoadedMsg{err: err, selectedID: id, preserveCursor: true}
 		}

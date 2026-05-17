@@ -7,26 +7,26 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
-	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
+	"github.com/dnlopes/overseer/internal/core/domain"
+	"github.com/dnlopes/overseer/internal/core/service"
 	"github.com/dnlopes/overseer/internal/testutil/mocks"
 )
 
-func newTestSession(name string) domainsession.Session {
-	s, err := domainsession.New(name, "test-project")
+func newTestSession(name string) domain.Session {
+	s, err := domain.NewSession(name, "test-project")
 	if err != nil {
 		panic(err)
 	}
 	return s
 }
 
-func newRenameFormFixture(current domainsession.Session) (RenameFormModel, *mocks.MockSessionRepository) {
+func newRenameFormFixture(current domain.Session) (RenameFormModel, *mocks.MockSessionRepository) {
 	mock := &mocks.MockSessionRepository{
 		GetResult:  current,
-		ListResult: []domainsession.Session{current},
+		ListResult: []domain.Session{current},
 	}
-	uc := servicesession.NewRenameUseCase(mock, slog.Default())
-	m := NewRenameForm(styles.New(), uc, current)
+	svc := service.NewSessionService(mock, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, slog.Default())
+	m := NewRenameForm(styles.New(), svc, current)
 	return m, mock
 }
 

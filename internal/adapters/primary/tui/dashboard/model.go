@@ -7,13 +7,9 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 
-	"github.com/dnlopes/overseer/internal/adapters/primary/tui/help"
-	"github.com/dnlopes/overseer/internal/adapters/primary/tui/preview"
 	sessionui "github.com/dnlopes/overseer/internal/adapters/primary/tui/session"
-	"github.com/dnlopes/overseer/internal/adapters/primary/tui/status"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	"github.com/dnlopes/overseer/internal/adapters/primary/tui/titlebar"
-	servicesession "github.com/dnlopes/overseer/internal/core/service/session"
+	"github.com/dnlopes/overseer/internal/core/service"
 )
 
 type Pane int
@@ -24,11 +20,11 @@ const (
 )
 
 type Model struct {
-	titlebar     titlebar.Model
+	titlebar     TitlebarModel
 	sessionsList sessionui.Model
-	statusBar    status.Model
-	previewPane  preview.Model
-	helpBar      help.Model
+	statusBar    StatusModel
+	previewPane  PreviewModel
+	helpBar      HelpModel
 	activePane   Pane
 	createForm   *sessionui.CreateFormModel
 	renameForm   *sessionui.RenameFormModel
@@ -36,31 +32,25 @@ type Model struct {
 	height       int
 	tooSmall     bool
 	styles       *styles.Styles
-	createUC     *servicesession.CreateUseCase
-	renameUC     *servicesession.RenameUseCase
-	reorderUC    *servicesession.ReorderUseCase
-	listUC       *servicesession.ListUseCase
+	svc          *service.SessionService
 }
 
 func New(
 	s *styles.Styles,
-	createUC *servicesession.CreateUseCase,
-	renameUC *servicesession.RenameUseCase,
-	reorderUC *servicesession.ReorderUseCase,
-	listUC *servicesession.ListUseCase,
-	registry *help.Registry,
+	svc *service.SessionService,
+	registry *HelpRegistry,
 ) Model {
 	if registry == nil {
-		registry = help.NewRegistry()
+		registry = NewHelpRegistry()
 	}
 
-	tb := titlebar.New(s, "Overseer")
-	tbModel, _ := tb.Update(titlebar.SetActivePaneMsg{Label: "Sessions"})
+	tb := newTitlebar(s, "Overseer")
+	tbModel, _ := tb.Update(TitlebarSetActivePaneMsg{Label: "Sessions"})
 
-	sl := sessionui.New(s, listUC)
-	sb := status.New(s)
-	pp := preview.New(s)
-	hb := help.NewHelpBar(registry, s)
+	sl := sessionui.New(s, svc)
+	sb := newStatus(s)
+	pp := newPreview(s)
+	hb := newHelpBar(registry, s)
 
 	registry.RegisterPane("sessions", append(sl.Keybindings(),
 		key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new session")),
@@ -72,17 +62,14 @@ func New(
 	hb.SetActivePane("sessions")
 
 	return Model{
-		titlebar:     tbModel.(titlebar.Model),
+		titlebar:     tbModel.(TitlebarModel),
 		sessionsList: sl,
 		statusBar:    sb,
 		previewPane:  pp,
 		helpBar:      hb,
 		activePane:   PaneSessions,
 		styles:       s,
-		createUC:     createUC,
-		renameUC:     renameUC,
-		reorderUC:    reorderUC,
-		listUC:       listUC,
+		svc:          svc,
 		width:        80,
 		height:       24,
 	}
@@ -242,14 +229,14 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "n":
 		if m.activePane == PaneSessions {
-			cf := sessionui.NewCreateForm(m.styles, m.createUC)
+			cf := sessionui.NewCreateForm(m.styles, m.svc)
 			m.createForm = &cf
 			return m, cf.Init()
 		}
 	case "r":
 		if m.activePane == PaneSessions {
 			if sess, ok := m.sessionsList.SelectedSession(); ok {
-				rf := sessionui.NewRenameForm(m.styles, m.renameUC, sess)
+				rf := sessionui.NewRenameForm(m.styles, m.svc, sess)
 				m.renameForm = &rf
 				return m, rf.Init()
 			}
@@ -266,11 +253,11 @@ func (m *Model) focus(p Pane) {
 	m.previewPane.SetFocus(p == PanePreview)
 	if p == PaneSessions {
 		m.helpBar.SetActivePane("sessions")
-		m.titlebar, _ = updateModel(m.titlebar, titlebar.SetActivePaneMsg{Label: "Sessions"})
+		m.titlebar, _ = updateModel(m.titlebar, TitlebarSetActivePaneMsg{Label: "Sessions"})
 		return
 	}
 	m.helpBar.SetActivePane("preview")
-	m.titlebar, _ = updateModel(m.titlebar, titlebar.SetActivePaneMsg{Label: "Preview"})
+	m.titlebar, _ = updateModel(m.titlebar, TitlebarSetActivePaneMsg{Label: "Preview"})
 }
 
 func (m Model) routeToActivePane(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -300,11 +287,11 @@ func (m Model) routeToActivePane(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) reorder(direction int) tea.Cmd {
 	sess, ok := m.sessionsList.SelectedSession()
-	if !ok || m.reorderUC == nil {
+	if !ok || m.svc == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		if _, err := m.reorderUC.Execute(context.Background(), servicesession.ReorderRequest{ID: sess.ID, Direction: direction}); err != nil {
+		if _, err := m.svc.Reorder(context.Background(), service.ReorderSessionRequest{ID: sess.ID, Direction: direction}); err != nil {
 			return nil
 		}
 		return m.sessionsList.ReloadPreservingSelection(sess.ID)()

@@ -1,9 +1,9 @@
 package session
 
-import domainsession "github.com/dnlopes/overseer/internal/core/domain/session"
+import "github.com/dnlopes/overseer/internal/core/domain"
 
-type SessionCreatedMsg struct{ Session domainsession.Session }
+type SessionCreatedMsg struct{ Session domain.Session }
 
-type SessionRenamedMsg struct{ Session domainsession.Session }
+type SessionRenamedMsg struct{ Session domain.Session }
 
 type CancelFormMsg struct{}
