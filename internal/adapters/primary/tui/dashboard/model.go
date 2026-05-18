@@ -90,7 +90,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// If a form is open, route all messages to it first
 	if m.createForm != nil {
 		var cmd tea.Cmd
-		m.createForm, cmd = shared.UpdateModel(m.createForm, msg)
+		createForm, cmd := shared.UpdateModel(*m.createForm, msg)
+		m.createForm = &createForm
 		return m, cmd
 	}
 
