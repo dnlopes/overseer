@@ -30,7 +30,7 @@ func sizedDashboard(t *testing.T, width, height int) Model {
 }
 
 func viewString(m Model) string {
-	return testutil.StripANSI(m.viewString(m.View()))
+	return testutil.StripANSI(m.View().Content)
 }
 
 func keyMsg(text string) tea.KeyPressMsg {
@@ -168,16 +168,6 @@ func TestDashboard_2JumpToPreview(t *testing.T) {
 	m = updated.(Model)
 	if m.activePane != PanePreview {
 		t.Fatalf("after 2: want PanePreview, got %d", m.activePane)
-	}
-}
-
-func TestDashboard_RWithNoSession(t *testing.T) {
-	m := sizedDashboard(t, 80, 24)
-
-	updated, _ := m.Update(keyMsg("r"))
-	m = updated.(Model)
-	if m.renameForm != nil {
-		t.Fatal("expected renameForm to remain nil with no selected session")
 	}
 }
 

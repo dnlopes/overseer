@@ -16,10 +16,9 @@ type TitlebarSetActivePaneMsg struct {
 
 // TitlebarModel renders the top title bar with app branding + active pane label.
 type TitlebarModel struct {
-	width      int
-	appName    string
-	activePane string
-	styles     *styles.Styles
+	width   int
+	appName string
+	styles  *styles.Styles
 }
 
 func newTitlebar(s *styles.Styles, appName string) TitlebarModel {
@@ -32,8 +31,6 @@ func (m TitlebarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-	case TitlebarSetActivePaneMsg:
-		m.activePane = msg.Label
 	}
 	return m, nil
 }
@@ -41,9 +38,6 @@ func (m TitlebarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m TitlebarModel) View() tea.View {
 	branding := m.styles.TitleBar.Branding.Render(m.appName)
 	right := ""
-	if m.activePane != "" {
-		right = m.styles.TitleBar.Subtext.Render(m.activePane)
-	}
 	gap := ""
 	if m.width > 0 {
 		brandingWidth := lipgloss.Width(branding)

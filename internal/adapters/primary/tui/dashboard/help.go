@@ -17,15 +17,13 @@ type HelpRegistry struct {
 
 // NewHelpRegistry returns a HelpRegistry pre-populated with application-wide bindings:
 // quit, next-pane, toggle-help, and the numeric pane-jump keys.
-func NewHelpRegistry() *HelpRegistry {
-	return &HelpRegistry{
+func NewHelpRegistry() HelpRegistry {
+	return HelpRegistry{
 		paneBindings: make(map[string][]key.Binding),
 		globalBindings: []key.Binding{
 			key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next pane")),
 			key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "toggle help")),
-			key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "jump to pane 1")),
-			key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "jump to pane 2")),
 		},
 	}
 }
@@ -69,13 +67,13 @@ func defaultHelpBarKeys() helpBarKeys {
 // HelpModel is the BubbleTea sub-model for the help bar.
 type HelpModel struct {
 	help       bubblehelp.Model
-	registry   *HelpRegistry
+	registry   HelpRegistry
 	activePane string
 	showFull   bool
 	keys       helpBarKeys
 }
 
-func newHelpBar(registry *HelpRegistry, s *styles.Styles) HelpModel {
+func newHelpBar(registry HelpRegistry, s *styles.Styles) HelpModel {
 	return HelpModel{
 		help:     newHelpComponent(s),
 		registry: registry,
