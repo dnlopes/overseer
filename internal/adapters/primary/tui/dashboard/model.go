@@ -29,12 +29,12 @@ type Model struct {
 	createForm   *sessionui.CreateFormModel
 
 	// this model state
-	activePane Pane
-	width      int
-	height     int
-	tooSmall   bool
-	styles     *styles.Styles
-	svc        *service.SessionService
+	activePane      Pane
+	width           int
+	height          int
+	tooSmall        bool
+	styles          *styles.Styles
+	sessionsService *service.SessionService
 }
 
 func New(styles *styles.Styles, sessionsService *service.SessionService, registry HelpRegistry) Model {
@@ -46,14 +46,14 @@ func New(styles *styles.Styles, sessionsService *service.SessionService, registr
 	helpBar.SetActivePane("sessions")
 
 	return Model{
-		titlebar:     newTitlebar(styles, "Overseer"),
-		sessionsList: sessions,
-		helpBar:      helpBar,
-		activePane:   PaneSessions,
-		styles:       styles,
-		svc:          sessionsService,
-		width:        80,
-		height:       24,
+		titlebar:        newTitlebar(styles, "Overseer"),
+		sessionsList:    sessions,
+		helpBar:         helpBar,
+		activePane:      PaneSessions,
+		styles:          styles,
+		sessionsService: sessionsService,
+		width:           80,
+		height:          24,
 	}
 }
 
@@ -80,11 +80,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpBar, cmd = shared.UpdateModel(m.helpBar, msg)
 			return m, cmd
 		}
-		if m.createForm == nil && key.Matches(msg, shared.NewSessionKey) && m.activePane == PaneSessions {
-			cf := sessionui.NewCreateForm(m.styles, m.svc)
+		if key.Matches(msg, shared.NewSessionKey) && m.createForm == nil && m.activePane == PaneSessions {
+			cf := sessionui.NewCreateForm(m.styles, m.sessionsService)
 			m.createForm = &cf
 			return m, cf.Init()
-			return m.updateKey(msg)
 		}
 	}
 
@@ -150,7 +149,7 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "n":
 		if m.activePane == PaneSessions {
-			cf := sessionui.NewCreateForm(m.styles, m.svc)
+			cf := sessionui.NewCreateForm(m.styles, m.sessionsService)
 			m.createForm = &cf
 			return m, cf.Init()
 		}
@@ -192,11 +191,11 @@ func (m Model) routeToActivePane(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) reorder(direction int) tea.Cmd {
 	sess, ok := m.sessionsList.SelectedSession()
-	if !ok || m.svc == nil {
+	if !ok || m.sessionsService == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		if _, err := m.svc.Reorder(context.Background(), service.ReorderSessionRequest{ID: sess.ID, Direction: direction}); err != nil {
+		if _, err := m.sessionsService.Reorder(context.Background(), service.ReorderSessionRequest{ID: sess.ID, Direction: direction}); err != nil {
 			return nil
 		}
 		return m.sessionsList.ReloadPreservingSelection(sess.ID)()
