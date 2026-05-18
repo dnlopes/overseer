@@ -61,6 +61,10 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.titlebar.Init(), m.sessionsList.Init(), m.helpBar.Init())
 }
 
+func (m Model) hasFocus() bool {
+	return m.createForm == nil
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -72,10 +76,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.createForm = nil
 		return m, nil
 	case tea.KeyPressMsg:
-		if key.Matches(msg, shared.QuitKey) {
+		if key.Matches(msg, shared.QuitKey) && m.hasFocus() {
 			return m, tea.Quit
 		}
-		if key.Matches(msg, shared.HelpMenuKey) {
+		if key.Matches(msg, shared.HelpMenuKey) && m.hasFocus() {
 			var cmd tea.Cmd
 			m.helpBar, cmd = shared.UpdateModel(m.helpBar, msg)
 			return m, cmd
