@@ -78,7 +78,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpBar, cmd = shared.UpdateModel(m.helpBar, msg)
 			return m, cmd
 		}
-		if key.Matches(msg, newSessionKeyBinding) && !m.focused && m.sessionsModel.IsFocused() {
+		if key.Matches(msg, newSessionKeyBinding) && m.focused && m.sessionsModel.IsFocused() {
 			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService)
 			m.focused = false
 			return m, m.createForm.Init()

@@ -58,8 +58,6 @@ func (m CreateFormModel) Init() tea.Cmd {
 	return nil
 }
 
-type createErrMsg struct{ err error }
-
 func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
@@ -81,9 +79,16 @@ func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if msg, ok := msg.(createErrMsg); ok {
-		m.errMsg = msg.err.Error()
+	if msg, ok := msg.(shared.SessionCreateErrMsg); ok {
+		m.errMsg = msg.Err.Error()
 		return m, nil
+	}
+
+	if msg, ok := msg.(shared.SessionCreatedMsg); ok {
+		return m, tea.Batch(
+			shared.Emit(msg),
+			shared.Emit(shared.NewSessionPopupCloseMsg{}),
+		)
 	}
 
 	switch m.focusIndex.Value() {
@@ -118,7 +123,7 @@ func (m CreateFormModel) submit() (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg {
 		resp, err := m.sessionsService.Create(context.Background(), req)
 		if err != nil {
-			return createErrMsg{err: err}
+			return shared.SessionCreateErrMsg{Err: err}
 		}
 		return shared.SessionCreatedMsg{Session: resp.Session}
 	}
