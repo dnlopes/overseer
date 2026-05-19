@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/google/uuid"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
@@ -36,8 +37,7 @@ func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, pro
 	nameInput.Placeholder = "Session name"
 	nameInput.CharLimit = 100
 	nameInput.SetWidth(36)
-	nameInput.SetStyles(textinput.Styles{})
-	nameInput.SetVirtualCursor(false)
+	nameInput.SetStyles(s.Form.Input)
 	nameInput.Focus()
 
 	return CreateFormModel{
@@ -51,7 +51,7 @@ func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, pro
 }
 
 func (m CreateFormModel) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
 func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -155,11 +155,11 @@ func (m CreateFormModel) View() tea.View {
 	s := m.styles.Form.Field
 
 	var b strings.Builder
-	b.WriteString(s.Label.Render("Name"))
+	b.WriteString(m.labelStyle(FieldNameSelectedIndex).Render("Name"))
 	b.WriteByte('\n')
 	b.WriteString(m.nameInput.View())
 	b.WriteByte('\n')
-	b.WriteString(s.Label.Render("Project"))
+	b.WriteString(m.labelStyle(FieldProjectSelectedIndex).Render("Project"))
 	b.WriteByte('\n')
 	b.WriteString(m.projectSelectorView())
 	b.WriteByte('\n')
@@ -170,6 +170,13 @@ func (m CreateFormModel) View() tea.View {
 	}
 	b.WriteString(m.styles.Help.Description.Render("Tab: next field  ←/→: cycle project  Enter: submit  Esc: cancel"))
 	return tea.NewView(components.Modal(m.styles, b.String(), 0, 0))
+}
+
+func (m CreateFormModel) labelStyle(field int) lipgloss.Style {
+	if m.focusIndex.Value() == field {
+		return m.styles.Form.Field.LabelFocused
+	}
+	return m.styles.Form.Field.Label
 }
 
 func (m CreateFormModel) projectSelectorView() string {

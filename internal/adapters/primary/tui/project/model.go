@@ -2,9 +2,11 @@ package project
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
@@ -63,11 +65,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.loadProjects()
 	case components.TreeSelectMsg[projectNode]:
 		return m, shared.Emit(shared.ProjectSelectedMsg{ID: msg.Item.projectID})
+	case tea.KeyPressMsg:
+		if m.focused && key.Matches(msg, jumpToProjectKeyBinding) {
+			return m.jumpToIndex(int(msg.String()[0] - '1'))
+		}
 	}
 
 	var cmd tea.Cmd
 	m.tree, cmd = m.tree.Update(msg)
 	return m, m.translateTreeSelection(cmd)
+}
+
+func (m Model) jumpToIndex(idx int) (tea.Model, tea.Cmd) {
+	if idx < 0 || idx >= m.tree.RowCount() {
+		return m, nil
+	}
+	m.tree = m.tree.SelectIndex(idx)
+	return m, m.tree.EmitSelection()
 }
 
 func (m Model) translateTreeSelection(cmd tea.Cmd) tea.Cmd {
@@ -148,13 +162,11 @@ func firstProjectID(projects []domain.Project) string {
 }
 
 func renderProjectNode(s *styles.Styles) components.TreeRenderFunc[projectNode] {
-	return func(item projectNode, depth int, hasKids, expanded, focused bool) string {
-		row := "  " + item.label
+	return func(item projectNode, index, _ int, _, _, focused bool) string {
+		number := fmt.Sprintf("%02d. ", index+1)
 		if focused {
-			row = s.Session.Item.Selected.Render(row)
-		} else {
-			row = s.Session.Item.Normal.Render(row)
+			return s.ListRow.NumberSelected.Render(number) + s.ListRow.Selected.Render(item.label)
 		}
-		return row
+		return s.ListRow.Number.Render(number) + s.ListRow.Normal.Render(item.label)
 	}
 }

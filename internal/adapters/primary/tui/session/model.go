@@ -2,9 +2,11 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/google/uuid"
 
@@ -35,19 +37,21 @@ type sessionNode struct {
 	kind      sessionNodeKind
 	sessionID string
 	label     string
+	number    int
 }
 
 type Model struct {
-	sessions     []domain.Session
-	projectNames map[uuid.UUID]string
-	groupingMode sessionGroupingMode
-	styles       *styles.Styles
-	service      service.SessionService
-	tree         components.TreeModel[sessionNode]
-	focused      bool
-	width        int
-	height       int
-	err          error
+	sessions           []domain.Session
+	projectNames       map[uuid.UUID]string
+	groupingMode       sessionGroupingMode
+	styles             *styles.Styles
+	service            service.SessionService
+	tree               components.TreeModel[sessionNode]
+	numberedSessionIDs []string
+	focused            bool
+	width              int
+	height             int
+	err                error
 }
 
 func New(s *styles.Styles, service service.SessionService) Model {
@@ -63,7 +67,13 @@ func New(s *styles.Styles, service service.SessionService) Model {
 
 func (m *Model) SetProjectNames(names map[uuid.UUID]string) {
 	m.projectNames = names
-	m.tree = m.tree.SetNodes(m.sessionTreeNodes()).ExpandAll()
+	m.rebuildTree()
+}
+
+func (m *Model) rebuildTree() {
+	nodes, ids := numberSessions(m.sessionTreeNodes())
+	m.numberedSessionIDs = ids
+	m.tree = m.tree.SetNodes(nodes).ExpandAll()
 }
 
 func (m Model) Init() tea.Cmd {
@@ -78,7 +88,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.sessions = msg.Sessions
-		m.tree = m.tree.SetNodes(m.sessionTreeNodes()).ExpandAll()
+		m.rebuildTree()
 		firstSessionID := firstSessionID(m.sessions)
 		if firstSessionID == "" {
 			return m, nil
@@ -92,11 +102,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, shared.Emit(shared.SessionSelectedMsg{ID: msg.Item.sessionID})
 		}
 		return m, nil
+	case tea.KeyPressMsg:
+		if m.focused && key.Matches(msg, jumpToSessionKeyBinding) {
+			return m.jumpToSession(int(msg.String()[0] - '1'))
+		}
 	}
 
 	var cmd tea.Cmd
 	m.tree, cmd = m.tree.Update(msg)
 	return m, m.translateTreeSelection(cmd)
+}
+
+func (m Model) jumpToSession(idx int) (tea.Model, tea.Cmd) {
+	if idx < 0 || idx >= len(m.numberedSessionIDs) {
+		return m, nil
+	}
+	sessID := m.numberedSessionIDs[idx]
+	m.tree = m.tree.SelectID("session:" + sessID)
+	return m, shared.Emit(shared.SessionSelectedMsg{ID: sessID})
 }
 
 func (m Model) translateTreeSelection(cmd tea.Cmd) tea.Cmd {
@@ -225,26 +248,39 @@ func firstSessionID(sessions []domain.Session) string {
 }
 
 func renderSessionNode(s *styles.Styles) components.TreeRenderFunc[sessionNode] {
-	return func(item sessionNode, depth int, hasKids, expanded, focused bool) string {
-		prefix := treePrefix(depth, hasKids, expanded)
-		row := prefix + item.label
+	return func(item sessionNode, _, depth int, hasKids, expanded, focused bool) string {
 		if item.kind == sessionNodeGroup {
-			row = s.Group.Header.Render(row)
-		} else if focused {
-			row = s.Session.Item.Selected.Render(row)
-		} else {
-			row = s.Session.Item.Normal.Render(row)
+			return s.Group.Header.Render(components.TreePrefix(depth, hasKids, expanded) + item.label)
 		}
-		return row
+		number := fmt.Sprintf("%s%02d. ", strings.Repeat(" ", depth*styles.ListIndentUnit), item.number)
+		if focused {
+			return s.ListRow.NumberSelected.Render(number) + s.ListRow.Selected.Render(item.label)
+		}
+		return s.ListRow.Number.Render(number) + s.ListRow.Normal.Render(item.label)
 	}
 }
 
-func treePrefix(depth int, hasKids, expanded bool) string {
-	indicator := "  "
-	if hasKids && expanded {
-		indicator = "▾ "
-	} else if hasKids {
-		indicator = "▸ "
+// numberSessions walks tree nodes in visual (top-to-bottom) order and
+// assigns a 1-based sequential number to every session-kind node. Group
+// nodes are skipped — they have no number. Returns the numbered tree
+// plus the list of session IDs indexed by their number-1 (so the Nth
+// session ID is ids[N-1]), which the digit-jump handler uses for lookup.
+func numberSessions(nodes []components.TreeNode[sessionNode]) ([]components.TreeNode[sessionNode], []string) {
+	var ids []string
+	var walk func(n components.TreeNode[sessionNode]) components.TreeNode[sessionNode]
+	walk = func(n components.TreeNode[sessionNode]) components.TreeNode[sessionNode] {
+		if n.Item.kind == sessionNodeSession {
+			ids = append(ids, n.Item.sessionID)
+			n.Item.number = len(ids)
+		}
+		for i, child := range n.Children {
+			n.Children[i] = walk(child)
+		}
+		return n
 	}
-	return strings.Repeat("  ", depth) + indicator
+	numbered := make([]components.TreeNode[sessionNode], len(nodes))
+	for i, n := range nodes {
+		numbered[i] = walk(n)
+	}
+	return numbered, ids
 }

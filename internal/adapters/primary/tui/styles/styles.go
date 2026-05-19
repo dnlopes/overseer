@@ -3,8 +3,22 @@ package styles
 import (
 	"image/color"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
+
+// ListIndentUnit is the canonical column count per nesting level for any
+// list/tree view in the TUI. Compose it at the render site to indent rows:
+//
+//	indent := strings.Repeat(" ", depth * styles.ListIndentUnit)
+//	row    := s.ListRow.Normal.Render(indent + label)
+//
+// Do NOT add Padding/Margin to ListRow itself, and do NOT create
+// domain-named row styles that bake position into their definition
+// (Session.Item.PaddingLeft was that mistake). Position is data —
+// it belongs in the render function, computed from the tree's depth.
+const ListIndentUnit = 2
 
 type BorderStyles struct {
 	Focused lipgloss.Style
@@ -22,15 +36,6 @@ type GroupStyles struct {
 	Header lipgloss.Style
 }
 
-type SessionItemStyles struct {
-	Normal   lipgloss.Style
-	Selected lipgloss.Style
-}
-
-type SessionStyles struct {
-	Item SessionItemStyles
-}
-
 type StatusStyles struct {
 	Label     lipgloss.Style
 	Value     lipgloss.Style
@@ -38,14 +43,19 @@ type StatusStyles struct {
 }
 
 type FormFieldStyles struct {
-	Label lipgloss.Style
-	Input lipgloss.Style
-	Error lipgloss.Style
+	Label        lipgloss.Style
+	LabelFocused lipgloss.Style
+	Input        lipgloss.Style
+	Error        lipgloss.Style
 }
 
 type FormStyles struct {
 	Field     FormFieldStyles
 	Container lipgloss.Style
+	// Input holds the bubbles textinput.Styles shared by every form field
+	// (placeholder appearance, focused/blurred prompt color, cursor blink).
+	// Configured once at theme load — see [New].
+	Input textinput.Styles
 }
 
 type HelpStyles struct {
@@ -82,12 +92,22 @@ type Styles struct {
 		Subtext  lipgloss.Style
 	}
 	Pane    PaneStyles
+	// ListRow describes the *appearance* of a row in any list/tree view —
+	// foreground, weight, selection background. It deliberately carries no
+	// padding or margin: spatial position (depth indent, prefixes) is the
+	// render function's job, composed via [ListIndentUnit]. Never add
+	// Padding to these styles or create per-depth row variants.
+	//
+	// Number / NumberSelected style the leading "NN. " prefix used by
+	// digit-jump lists; they share the selection background of their
+	// matching label state so the row reads as a single highlight.
 	ListRow struct {
-		Normal   lipgloss.Style
-		Selected lipgloss.Style
+		Normal         lipgloss.Style
+		Selected       lipgloss.Style
+		Number         lipgloss.Style
+		NumberSelected lipgloss.Style
 	}
 	Group         GroupStyles
-	Session       SessionStyles
 	Status        StatusStyles
 	StatusSegment struct {
 		Default   lipgloss.Style
@@ -144,20 +164,18 @@ func New() *Styles {
 			Container: lipgloss.NewStyle().Padding(0, 1),
 		},
 		ListRow: struct {
-			Normal   lipgloss.Style
-			Selected lipgloss.Style
+			Normal         lipgloss.Style
+			Selected       lipgloss.Style
+			Number         lipgloss.Style
+			NumberSelected lipgloss.Style
 		}{
-			Normal:   lipgloss.NewStyle().Foreground(theme.Text),
-			Selected: lipgloss.NewStyle().Foreground(theme.Text).Bold(true).Background(theme.SelectionBg),
+			Normal:         lipgloss.NewStyle().Foreground(theme.Text),
+			Selected:       lipgloss.NewStyle().Foreground(theme.Text).Bold(true).Background(theme.SelectionBg),
+			Number:         lipgloss.NewStyle().Foreground(theme.Subtext),
+			NumberSelected: lipgloss.NewStyle().Foreground(theme.Subtext).Bold(true).Background(theme.SelectionBg),
 		},
 		Group: GroupStyles{
 			Header: lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),
-		},
-		Session: SessionStyles{
-			Item: SessionItemStyles{
-				Normal:   lipgloss.NewStyle().PaddingLeft(2).Foreground(theme.Text),
-				Selected: lipgloss.NewStyle().PaddingLeft(2).Foreground(theme.Text).Bold(true).Background(theme.SelectionBg),
-			},
 		},
 		Status: StatusStyles{
 			Label:     lipgloss.NewStyle().Foreground(theme.Subtext),
@@ -177,9 +195,27 @@ func New() *Styles {
 				BorderForeground(theme.BorderFocus).
 				Padding(1, 2),
 			Field: FormFieldStyles{
-				Label: lipgloss.NewStyle().Foreground(theme.Subtext),
-				Input: lipgloss.NewStyle().Foreground(theme.Text),
-				Error: lipgloss.NewStyle().Foreground(theme.Warning),
+				Label:        lipgloss.NewStyle().Foreground(theme.Subtext),
+				LabelFocused: lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),
+				Input:        lipgloss.NewStyle().Foreground(theme.Text),
+				Error:        lipgloss.NewStyle().Foreground(theme.Warning),
+			},
+			Input: textinput.Styles{
+				Focused: textinput.StyleState{
+					Placeholder: lipgloss.NewStyle().Foreground(theme.Muted).Italic(true),
+					Prompt:      lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),
+					Text:        lipgloss.NewStyle().Foreground(theme.Text),
+				},
+				Blurred: textinput.StyleState{
+					Placeholder: lipgloss.NewStyle().Foreground(theme.Muted).Italic(true),
+					Prompt:      lipgloss.NewStyle().Foreground(theme.Muted),
+					Text:        lipgloss.NewStyle().Foreground(theme.Subtext),
+				},
+				Cursor: textinput.CursorStyle{
+					Color: theme.Accent,
+					Shape: tea.CursorBlock,
+					Blink: true,
+				},
 			},
 		},
 		Modal: struct {

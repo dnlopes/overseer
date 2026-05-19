@@ -5,7 +5,25 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 )
+
+// TreePrefix returns the leading string for a tree row at the given depth,
+// composed of (1) a depth-based indent using [styles.ListIndentUnit] and
+// (2) a collapse indicator (▾/▸) when the row has children. Use this from
+// any [TreeRenderFunc] that wants the standard tree-view look. Flat lists
+// (depth 0, no children) get a 2-space gutter that keeps labels aligned
+// with collapsible rows above/below.
+func TreePrefix(depth int, hasKids, expanded bool) string {
+	indicator := "  "
+	if hasKids && expanded {
+		indicator = "▾ "
+	} else if hasKids {
+		indicator = "▸ "
+	}
+	return strings.Repeat(" ", depth*styles.ListIndentUnit) + indicator
+}
 
 // TreeNode is what callers supply: a generic tree of items. The component
 // doesn't care what T is - it only navigates, expands, and renders.
@@ -16,9 +34,10 @@ type TreeNode[T any] struct {
 }
 
 // TreeRenderFunc lets callers control how each item is displayed.
-// Receives the item, indentation depth, whether it has children,
-// whether it's currently expanded, and whether the cursor is on it.
-type TreeRenderFunc[T any] func(item T, depth int, hasKids, expanded, focused bool) string
+// Receives the item, its zero-based row index (across visible rows),
+// indentation depth, whether it has children, whether it's currently
+// expanded, and whether the cursor is on it.
+type TreeRenderFunc[T any] func(item T, index, depth int, hasKids, expanded, focused bool) string
 
 // TreeSelectMsg is emitted whenever the cursor lands on a different node,
 // either by navigation or after a refresh.
@@ -153,6 +172,30 @@ func (m TreeModel[T]) SelectID(id string) TreeModel[T] {
 	return m
 }
 
+// SelectIndex moves the cursor to the row at the given zero-based index
+// among currently visible rows. Out-of-range indices are clamped — values
+// below 0 are ignored, values past the last row also ignored. Use
+// [TreeModel.RowCount] to check bounds before calling.
+func (m TreeModel[T]) SelectIndex(idx int) TreeModel[T] {
+	if idx < 0 || idx >= len(m.rows) {
+		return m
+	}
+	m.cursor = idx
+	return m
+}
+
+// RowCount returns the number of currently visible (post-flatten) rows.
+func (m TreeModel[T]) RowCount() int {
+	return len(m.rows)
+}
+
+// EmitSelection returns a tea.Cmd that emits a [TreeSelectMsg] for the
+// currently-selected row. Use this when changing the cursor from outside
+// the standard key handlers (e.g., number-prefix jump in the projects tab).
+func (m TreeModel[T]) EmitSelection() tea.Cmd {
+	return m.emitSelection()
+}
+
 func (m TreeModel[T]) Init() tea.Cmd { return nil }
 
 func (m TreeModel[T]) Update(msg tea.Msg) (TreeModel[T], tea.Cmd) {
@@ -194,7 +237,7 @@ func (m TreeModel[T]) View() string {
 	visible := m.visibleWindow()
 	for i := visible.top; i <= visible.bottom; i++ {
 		r := m.rows[i]
-		b.WriteString(m.render(r.item, r.depth, r.hasKids, r.expanded, i == m.cursor))
+		b.WriteString(m.render(r.item, i, r.depth, r.hasKids, r.expanded, i == m.cursor))
 		if i < visible.bottom {
 			b.WriteString("\n")
 		}

@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
@@ -35,16 +36,14 @@ func NewRegisterForm(s *styles.Styles, projectService service.ProjectService) Re
 	pathInput.Placeholder = "/absolute/path/to/repo"
 	pathInput.CharLimit = 4096
 	pathInput.SetWidth(48)
-	pathInput.SetStyles(textinput.Styles{})
-	pathInput.SetVirtualCursor(false)
+	pathInput.SetStyles(s.Form.Input)
 	pathInput.Focus()
 
 	nameInput := textinput.New()
 	nameInput.Placeholder = "Project name (auto-filled)"
 	nameInput.CharLimit = 100
 	nameInput.SetWidth(48)
-	nameInput.SetStyles(textinput.Styles{})
-	nameInput.SetVirtualCursor(false)
+	nameInput.SetStyles(s.Form.Input)
 	nameInput.Blur()
 
 	return RegisterFormModel{
@@ -57,7 +56,7 @@ func NewRegisterForm(s *styles.Styles, projectService service.ProjectService) Re
 }
 
 func (m RegisterFormModel) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
 func (m RegisterFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -157,11 +156,11 @@ func (m RegisterFormModel) View() tea.View {
 	s := m.styles.Form.Field
 
 	var b strings.Builder
-	b.WriteString(s.Label.Render("Path"))
+	b.WriteString(m.labelStyle(FieldPathSelectedIndex).Render("Path"))
 	b.WriteByte('\n')
 	b.WriteString(m.pathInput.View())
 	b.WriteByte('\n')
-	b.WriteString(s.Label.Render("Name"))
+	b.WriteString(m.labelStyle(FieldNameSelectedIndex).Render("Name"))
 	b.WriteByte('\n')
 	b.WriteString(m.nameInput.View())
 	b.WriteByte('\n')
@@ -172,6 +171,13 @@ func (m RegisterFormModel) View() tea.View {
 	}
 	b.WriteString(m.styles.Help.Description.Render("Tab: next field  Enter: submit  Esc: cancel"))
 	return tea.NewView(components.Modal(m.styles, b.String(), 0, 0))
+}
+
+func (m RegisterFormModel) labelStyle(field int) lipgloss.Style {
+	if m.focusIndex.Value() == field {
+		return m.styles.Form.Field.LabelFocused
+	}
+	return m.styles.Form.Field.Label
 }
 
 func (m RegisterFormModel) KeyBindings() []key.Binding {

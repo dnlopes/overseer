@@ -64,7 +64,7 @@ func TestTreeModel_HeightLimitsVisibleRows(t *testing.T) {
 }
 
 func newTestTree() components.TreeModel[string] {
-	tree := components.NewTree(func(item string, depth int, hasKids, expanded, focused bool) string {
+	tree := components.NewTree(func(item string, _, depth int, hasKids, expanded, _ bool) string {
 		prefix := "· "
 		if hasKids && expanded {
 			prefix = "▾ "
