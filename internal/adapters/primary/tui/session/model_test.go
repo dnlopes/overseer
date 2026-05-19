@@ -38,7 +38,7 @@ func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 		t.Fatalf("initial SessionSelectedMsg.ID = %q, want %q", msg.ID, alpha.ID.String())
 	}
 	view := updated.(Model).View().Content
-	for _, want := range []string{"● overseer", "alpha", "beta"} {
+	for _, want := range []string{"▼ overseer", "alpha", "beta"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("View() missing %q: %q", want, view)
 		}
@@ -58,7 +58,7 @@ func TestModel_RawGroupingModeRendersSessionsWithoutVirtualRows(t *testing.T) {
 	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
 
 	view := updated.(Model).View().Content
-	if strings.Contains(view, "● overseer") || strings.Contains(view, "● other") {
+	if strings.Contains(view, "▼ overseer") || strings.Contains(view, "▼ other") {
 		t.Fatalf("View() rendered virtual group rows in raw mode: %q", view)
 	}
 	for _, want := range []string{"alpha", "beta"} {

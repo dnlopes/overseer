@@ -11,17 +11,17 @@ import (
 
 // TreePrefix returns the leading string for a tree row at the given depth,
 // composed of (1) a depth-based indent using [styles.ListIndentUnit] and
-// (2) a collapse indicator (●/○) when the row has children — filled when
-// expanded, hollow when collapsed. Use this from any [TreeRenderFunc] that
+// (2) a collapse indicator (▼/▶) when the row has children — down when
+// expanded, right when collapsed. Use this from any [TreeRenderFunc] that
 // wants the standard tree-view look. Flat lists (depth 0, no children) get
 // a 2-space gutter that keeps labels aligned with collapsible rows above
 // or below.
 func TreePrefix(depth int, hasKids, expanded bool) string {
 	indicator := "  "
 	if hasKids && expanded {
-		indicator = "● "
+		indicator = "▼ "
 	} else if hasKids {
-		indicator = "○ "
+		indicator = "▶ "
 	}
 	return strings.Repeat(" ", depth*styles.ListIndentUnit) + indicator
 }
