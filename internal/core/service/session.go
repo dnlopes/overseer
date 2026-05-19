@@ -119,13 +119,8 @@ func (s *SessionService) Rename(ctx context.Context, req RenameSessionRequest) (
 
 type ListSessionsRequest struct{}
 
-type SessionGroup struct {
-	ProjectName string
-	Sessions    []domain.Session
-}
-
 type ListSessionsResponse struct {
-	Groups []SessionGroup
+	Sessions []domain.Session
 }
 
 func (s *SessionService) List(ctx context.Context, _ ListSessionsRequest) (ListSessionsResponse, error) {
@@ -134,23 +129,14 @@ func (s *SessionService) List(ctx context.Context, _ ListSessionsRequest) (ListS
 		return ListSessionsResponse{}, err
 	}
 
-	grouped := make(map[string]*SessionGroup)
-	for _, sess := range sessions {
-		if _, ok := grouped[sess.ProjectName]; !ok {
-			grouped[sess.ProjectName] = &SessionGroup{ProjectName: sess.ProjectName}
+	sort.Slice(sessions, func(i, j int) bool {
+		if sessions[i].ProjectName == sessions[j].ProjectName {
+			return sessions[i].Order < sessions[j].Order
 		}
-		grouped[sess.ProjectName].Sessions = append(grouped[sess.ProjectName].Sessions, sess)
-	}
+		return sessions[i].ProjectName < sessions[j].ProjectName
+	})
 
-	groups := make([]SessionGroup, 0, len(grouped))
-	for _, g := range grouped {
-		sort.Slice(g.Sessions, func(i, j int) bool { return g.Sessions[i].Order < g.Sessions[j].Order })
-		groups = append(groups, *g)
-	}
-
-	sort.Slice(groups, func(i, j int) bool { return groups[i].ProjectName < groups[j].ProjectName })
-
-	return ListSessionsResponse{Groups: groups}, nil
+	return ListSessionsResponse{Sessions: sessions}, nil
 }
 
 // --- Reorder ---

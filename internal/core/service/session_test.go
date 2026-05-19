@@ -281,15 +281,15 @@ func TestSessionService_List_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
-	if len(resp.Groups) != 0 {
-		t.Fatalf("List() len(Groups) = %d, want 0", len(resp.Groups))
+	if len(resp.Sessions) != 0 {
+		t.Fatalf("List() len(Sessions) = %d, want 0", len(resp.Sessions))
 	}
 	if repo.ListCalls != 1 {
 		t.Fatalf("SessionRepository.List calls = %d, want 1", repo.ListCalls)
 	}
 }
 
-func TestSessionService_List_SingleProject(t *testing.T) {
+func TestSessionService_List_ReturnsRawSessionsSortedByProjectThenOrder(t *testing.T) {
 	s1 := testutil.MakeSession("alpha", "overseer")
 	s1.Order = 2
 	s2 := testutil.MakeSession("beta", "overseer")
@@ -304,27 +304,21 @@ func TestSessionService_List_SingleProject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
-	if len(resp.Groups) != 1 {
-		t.Fatalf("List() len(Groups) = %d, want 1", len(resp.Groups))
+	if len(resp.Sessions) != 3 {
+		t.Fatalf("List() len(Sessions) = %d, want 3", len(resp.Sessions))
 	}
-	if resp.Groups[0].ProjectName != "overseer" {
-		t.Fatalf("Groups[0].ProjectName = %q, want %q", resp.Groups[0].ProjectName, "overseer")
+	if resp.Sessions[0].Name != "beta" {
+		t.Fatalf("Sessions[0].Name = %q, want %q", resp.Sessions[0].Name, "beta")
 	}
-	if len(resp.Groups[0].Sessions) != 3 {
-		t.Fatalf("Groups[0] len(Sessions) = %d, want 3", len(resp.Groups[0].Sessions))
+	if resp.Sessions[1].Name != "alpha" {
+		t.Fatalf("Sessions[1].Name = %q, want %q", resp.Sessions[1].Name, "alpha")
 	}
-	if resp.Groups[0].Sessions[0].Name != "beta" {
-		t.Fatalf("Sessions[0].Name = %q, want %q", resp.Groups[0].Sessions[0].Name, "beta")
-	}
-	if resp.Groups[0].Sessions[1].Name != "alpha" {
-		t.Fatalf("Sessions[1].Name = %q, want %q", resp.Groups[0].Sessions[1].Name, "alpha")
-	}
-	if resp.Groups[0].Sessions[2].Name != "gamma" {
-		t.Fatalf("Sessions[2].Name = %q, want %q", resp.Groups[0].Sessions[2].Name, "gamma")
+	if resp.Sessions[2].Name != "gamma" {
+		t.Fatalf("Sessions[2].Name = %q, want %q", resp.Sessions[2].Name, "gamma")
 	}
 }
 
-func TestSessionService_List_MultipleProjects(t *testing.T) {
+func TestSessionService_List_SortsProjectsWithoutGrouping(t *testing.T) {
 	s1 := testutil.MakeSession("alpha", "bravo")
 	s1.Order = 1
 	s2 := testutil.MakeSession("beta", "alpha")
@@ -337,14 +331,14 @@ func TestSessionService_List_MultipleProjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
-	if len(resp.Groups) != 2 {
-		t.Fatalf("List() len(Groups) = %d, want 2", len(resp.Groups))
+	if len(resp.Sessions) != 2 {
+		t.Fatalf("List() len(Sessions) = %d, want 2", len(resp.Sessions))
 	}
-	if resp.Groups[0].ProjectName != "alpha" {
-		t.Fatalf("Groups[0].ProjectName = %q, want %q", resp.Groups[0].ProjectName, "alpha")
+	if resp.Sessions[0].ProjectName != "alpha" {
+		t.Fatalf("Sessions[0].ProjectName = %q, want %q", resp.Sessions[0].ProjectName, "alpha")
 	}
-	if resp.Groups[1].ProjectName != "bravo" {
-		t.Fatalf("Groups[1].ProjectName = %q, want %q", resp.Groups[1].ProjectName, "bravo")
+	if resp.Sessions[1].ProjectName != "bravo" {
+		t.Fatalf("Sessions[1].ProjectName = %q, want %q", resp.Sessions[1].ProjectName, "bravo")
 	}
 }
 
@@ -363,10 +357,7 @@ func TestSessionService_List_OrderWithinGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
-	if len(resp.Groups) != 1 {
-		t.Fatalf("List() len(Groups) = %d, want 1", len(resp.Groups))
-	}
-	sessions := resp.Groups[0].Sessions
+	sessions := resp.Sessions
 	if sessions[0].Order != 3 || sessions[1].Order != 7 || sessions[2].Order != 10 {
 		t.Fatalf("Sessions not sorted by Order ASC: got %d,%d,%d, want 3,7,10",
 			sessions[0].Order, sessions[1].Order, sessions[2].Order)
