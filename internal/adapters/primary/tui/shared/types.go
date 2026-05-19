@@ -19,10 +19,8 @@ type KeyBindable interface {
 }
 
 type Component interface {
-	Init() tea.Cmd
-	Update(msg tea.Msg) (tea.Model, tea.Cmd)
-	View() tea.View
+	tea.Model
 	Focusable
 	KeyBindable
-	Focusable
+	Resizable
 }
