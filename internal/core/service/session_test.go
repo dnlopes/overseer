@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/dnlopes/overseer/internal/core/domain"
 	"github.com/dnlopes/overseer/internal/shared/errs"
@@ -33,15 +34,29 @@ func assertSessionOrder(t *testing.T, sessions []domain.Session, name string, wa
 	t.Fatalf("session %q not found in response", name)
 }
 
+func newSessionMocks(t *testing.T) (*mocks.MockSessionRepository, *mocks.MockTmuxAdapter, *mocks.MockGitAdapter) {
+	t.Helper()
+	return mocks.NewMockSessionRepository(t),
+		mocks.NewMockTmuxAdapter(t),
+		mocks.NewMockGitAdapter(t)
+}
+
 // --- Create ---
 
 func TestSessionService_Create_HappyPath(t *testing.T) {
 	overseerID := uuid.New()
-	repo := &mocks.MockSessionRepository{}
-	tmux := &mocks.MockTmuxAdapter{CreateSessionResult: "tmux-alpha"}
-	git := &mocks.MockGitAdapter{}
-	svc := NewSessionService(repo, tmux, git, testLogger())
+	repo, tmux, git := newSessionMocks(t)
 
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "alpha").Return("tmux-alpha", nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, "main", "alpha").Return(nil).Once()
+
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if err != nil {
@@ -56,27 +71,20 @@ func TestSessionService_Create_HappyPath(t *testing.T) {
 	if resp.Session.Order != 1 {
 		t.Fatalf("Create() Session.Order = %d, want 1", resp.Session.Order)
 	}
-	if repo.ListCalls != 1 {
-		t.Fatalf("SessionRepository.List calls = %d, want 1", repo.ListCalls)
-	}
-	if tmux.CreateSessionCalls != 1 {
-		t.Fatalf("Tmux.CreateSession calls = %d, want 1", tmux.CreateSessionCalls)
-	}
-	if git.CreateWorktreeCalls != 1 {
-		t.Fatalf("Git.CreateWorktree calls = %d, want 1", git.CreateWorktreeCalls)
-	}
-	if repo.SaveCalls != 1 {
-		t.Fatalf("SessionRepository.Save calls = %d, want 1", repo.SaveCalls)
-	}
-	if repo.SavedSession.Name != "alpha" || repo.SavedSession.ProjectID != overseerID || repo.SavedSession.Order != 1 {
-		t.Fatalf("SessionRepository.Save session = %#v, want alpha/<overseerID>/order 1", repo.SavedSession)
+	if savedSession.Name != "alpha" || savedSession.ProjectID != overseerID || savedSession.Order != 1 {
+		t.Fatalf("SessionRepository.Save session = %#v, want alpha/<overseerID>/order 1", savedSession)
 	}
 }
 
 func TestSessionService_Create_WithoutProjectAllowed(t *testing.T) {
-	repo := &mocks.MockSessionRepository{}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
 
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "orphan").Return("tmux-orphan", nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, "main", "orphan").Return(nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "orphan", ProjectID: uuid.Nil})
 
 	if err != nil {
@@ -88,9 +96,7 @@ func TestSessionService_Create_WithoutProjectAllowed(t *testing.T) {
 }
 
 func TestSessionService_Create_EmptyName(t *testing.T) {
-	repo := &mocks.MockSessionRepository{}
-	tmux := &mocks.MockTmuxAdapter{}
-	git := &mocks.MockGitAdapter{}
+	repo, tmux, git := newSessionMocks(t)
 	svc := NewSessionService(repo, tmux, git, testLogger())
 
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "", ProjectID: uuid.New()})
@@ -98,24 +104,19 @@ func TestSessionService_Create_EmptyName(t *testing.T) {
 	if !errors.Is(err, domain.ErrSessionEmptyName) {
 		t.Fatalf("Create() error = %v, want %v", err, domain.ErrSessionEmptyName)
 	}
-	if repo.ListCalls != 0 || tmux.CreateSessionCalls != 0 || git.CreateWorktreeCalls != 0 || repo.SaveCalls != 0 {
-		t.Fatalf("mocks called on validation failure: list=%d tmux=%d git=%d save=%d", repo.ListCalls, tmux.CreateSessionCalls, git.CreateWorktreeCalls, repo.SaveCalls)
-	}
 }
 
 func TestSessionService_Create_DuplicateNameWithinSameProject(t *testing.T) {
 	overseerID := uuid.New()
 	existing := testutil.MakeSession("alpha", overseerID)
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{existing}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if !errors.Is(err, domain.ErrSessionAlreadyExists) {
 		t.Fatalf("Create() error = %v, want %v", err, domain.ErrSessionAlreadyExists)
-	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SessionRepository.Save calls = %d, want 0 on duplicate", repo.SaveCalls)
 	}
 }
 
@@ -123,9 +124,13 @@ func TestSessionService_Create_DuplicateNameAcrossProjectsAllowed(t *testing.T) 
 	overseerID := uuid.New()
 	otherID := uuid.New()
 	existing := testutil.MakeSession("alpha", otherID)
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{existing}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "alpha").Return("tmux-alpha", nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, "main", "alpha").Return(nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if err != nil {
@@ -135,9 +140,10 @@ func TestSessionService_Create_DuplicateNameAcrossProjectsAllowed(t *testing.T) 
 
 func TestSessionService_Create_DuplicateNameAmongUnassignedSessions(t *testing.T) {
 	existing := testutil.MakeSession("solo", uuid.Nil)
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{existing}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "solo", ProjectID: uuid.Nil})
 
 	if !errors.Is(err, domain.ErrSessionAlreadyExists) {
@@ -154,9 +160,18 @@ func TestSessionService_Create_OrderIncrement(t *testing.T) {
 	second.Order = 2
 	otherProject := testutil.MakeSession("gamma", otherID)
 	otherProject.Order = 9
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{first, second, otherProject}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).
+		Return([]domain.Session{first, second, otherProject}, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "gamma").Return("tmux-gamma", nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, "main", "gamma").Return(nil).Once()
 
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "gamma", ProjectID: overseerID})
 
 	if err != nil {
@@ -165,28 +180,22 @@ func TestSessionService_Create_OrderIncrement(t *testing.T) {
 	if resp.Session.Order != 3 {
 		t.Fatalf("Create() Session.Order = %d, want 3", resp.Session.Order)
 	}
-	if repo.SavedSession.Order != 3 {
-		t.Fatalf("SessionRepository.Save Order = %d, want 3", repo.SavedSession.Order)
+	if savedSession.Order != 3 {
+		t.Fatalf("SessionRepository.Save Order = %d, want 3", savedSession.Order)
 	}
 }
 
 func TestSessionService_Create_TmuxError(t *testing.T) {
 	tmuxErr := errors.New("tmux unavailable")
-	repo := &mocks.MockSessionRepository{}
-	tmux := &mocks.MockTmuxAdapter{CreateSessionErr: tmuxErr}
-	git := &mocks.MockGitAdapter{}
-	svc := NewSessionService(repo, tmux, git, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "alpha").Return("", tmuxErr).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: uuid.New()})
 
 	if !errors.Is(err, tmuxErr) {
 		t.Fatalf("Create() error = %v, want wrapped %v", err, tmuxErr)
-	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SessionRepository.Save calls = %d, want 0", repo.SaveCalls)
-	}
-	if git.CreateWorktreeCalls != 0 {
-		t.Fatalf("Git.CreateWorktree calls = %d, want 0", git.CreateWorktreeCalls)
 	}
 }
 
@@ -195,9 +204,13 @@ func TestSessionService_Create_FirstSessionOrder(t *testing.T) {
 	otherID := uuid.New()
 	otherProject := testutil.MakeSession("alpha", otherID)
 	otherProject.Order = 4
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{otherProject}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{otherProject}, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "alpha").Return("tmux-alpha", nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, "main", "alpha").Return(nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if err != nil {
@@ -212,12 +225,16 @@ func TestSessionService_Create_FirstSessionOrder(t *testing.T) {
 
 func TestSessionService_Rename_HappyPath(t *testing.T) {
 	original := testutil.MakeSession("alpha", uuid.New())
-	repo := &mocks.MockSessionRepository{
-		GetResult:  original,
-		ListResult: []domain.Session{original},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, original.ID).Return(original, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{original}, nil).Once()
 
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: "beta"})
 
 	if err != nil {
@@ -226,46 +243,36 @@ func TestSessionService_Rename_HappyPath(t *testing.T) {
 	if resp.Session.Name != "beta" {
 		t.Fatalf("Rename() Session.Name = %q, want %q", resp.Session.Name, "beta")
 	}
-	if repo.GetCalls != 1 {
-		t.Fatalf("SessionRepository.Get calls = %d, want 1", repo.GetCalls)
-	}
-	if repo.ListCalls != 1 {
-		t.Fatalf("SessionRepository.List calls = %d, want 1", repo.ListCalls)
-	}
-	if repo.SaveCalls != 1 {
-		t.Fatalf("SessionRepository.Save calls = %d, want 1", repo.SaveCalls)
-	}
-	if repo.SavedSession.Name != "beta" {
-		t.Fatalf("SessionRepository.Save Session.Name = %q, want %q", repo.SavedSession.Name, "beta")
+	if savedSession.Name != "beta" {
+		t.Fatalf("SessionRepository.Save Session.Name = %q, want %q", savedSession.Name, "beta")
 	}
 }
 
 func TestSessionService_Rename_EmptyName(t *testing.T) {
 	original := testutil.MakeSession("alpha", uuid.New())
-	repo := &mocks.MockSessionRepository{GetResult: original}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, original.ID).Return(original, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{original}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: ""})
 
 	if !errors.Is(err, domain.ErrSessionEmptyName) {
 		t.Fatalf("Rename() error = %v, want %v", err, domain.ErrSessionEmptyName)
 	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SessionRepository.Save calls = %d, want 0 on validation failure", repo.SaveCalls)
-	}
 }
 
 func TestSessionService_Rename_NotFound(t *testing.T) {
-	repo := &mocks.MockSessionRepository{GetErr: domain.ErrSessionNotFound}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	missingID := uuid.New()
+	repo.EXPECT().Get(mock.Anything, missingID).
+		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
 
-	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: uuid.New(), NewName: "beta"})
+	svc := NewSessionService(repo, tmux, git, testLogger())
+	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: missingID, NewName: "beta"})
 
 	if !errors.Is(err, domain.ErrSessionNotFound) {
 		t.Fatalf("Rename() error = %v, want %v", err, domain.ErrSessionNotFound)
-	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SessionRepository.Save calls = %d, want 0 when not found", repo.SaveCalls)
 	}
 }
 
@@ -273,19 +280,16 @@ func TestSessionService_Rename_DuplicateNameInSameProject(t *testing.T) {
 	overseerID := uuid.New()
 	original := testutil.MakeSession("alpha", overseerID)
 	conflicting := testutil.MakeSession("beta", overseerID)
-	repo := &mocks.MockSessionRepository{
-		GetResult:  original,
-		ListResult: []domain.Session{original, conflicting},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, original.ID).Return(original, nil).Once()
+	repo.EXPECT().List(mock.Anything).
+		Return([]domain.Session{original, conflicting}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: "beta"})
 
 	if !errors.Is(err, domain.ErrSessionAlreadyExists) {
 		t.Fatalf("Rename() error = %v, want %v", err, domain.ErrSessionAlreadyExists)
-	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SessionRepository.Save calls = %d, want 0 on duplicate", repo.SaveCalls)
 	}
 }
 
@@ -294,28 +298,33 @@ func TestSessionService_Rename_UpdatedAtChanges(t *testing.T) {
 	original.UpdatedAt = time.Now().Add(-time.Minute)
 	beforeRename := original.UpdatedAt
 
-	repo := &mocks.MockSessionRepository{
-		GetResult:  original,
-		ListResult: []domain.Session{original},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, original.ID).Return(original, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{original}, nil).Once()
 
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: "beta"})
 
 	if err != nil {
 		t.Fatalf("Rename() error = %v", err)
 	}
-	if !repo.SavedSession.UpdatedAt.After(beforeRename) {
-		t.Fatalf("SavedSession.UpdatedAt = %v, want after %v", repo.SavedSession.UpdatedAt, beforeRename)
+	if !savedSession.UpdatedAt.After(beforeRename) {
+		t.Fatalf("SavedSession.UpdatedAt = %v, want after %v", savedSession.UpdatedAt, beforeRename)
 	}
 }
 
 // --- List ---
 
 func TestSessionService_List_Empty(t *testing.T) {
-	repo := &mocks.MockSessionRepository{}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -323,9 +332,6 @@ func TestSessionService_List_Empty(t *testing.T) {
 	}
 	if len(resp.Sessions) != 0 {
 		t.Fatalf("List() len(Sessions) = %d, want 0", len(resp.Sessions))
-	}
-	if repo.ListCalls != 1 {
-		t.Fatalf("SessionRepository.List calls = %d, want 1", repo.ListCalls)
 	}
 }
 
@@ -337,9 +343,10 @@ func TestSessionService_List_SortsByOrderWithinSameProject(t *testing.T) {
 	s2.Order = 1
 	s3 := testutil.MakeSession("gamma", projectID)
 	s3.Order = 3
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{s1, s2, s3}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{s1, s2, s3}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -366,9 +373,11 @@ func TestSessionService_List_GroupsByProjectID(t *testing.T) {
 	highSession.Order = 1
 	lowSession := testutil.MakeSession("beta", lowID)
 	lowSession.Order = 1
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{highSession, lowSession}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).
+		Return([]domain.Session{highSession, lowSession}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -393,9 +402,10 @@ func TestSessionService_List_OrderWithinGroup(t *testing.T) {
 	s2.Order = 3
 	s3 := testutil.MakeSession("third", projectID)
 	s3.Order = 7
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{s1, s2, s3}}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{s1, s2, s3}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -419,19 +429,16 @@ func TestSessionService_Reorder_MoveDown(t *testing.T) {
 	c := testutil.MakeSession("C", projectID)
 	c.Order = 3
 
-	repo := &mocks.MockSessionRepository{
-		GetResult:  b,
-		ListResult: []domain.Session{a, b, c},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, b.ID).Return(b, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Twice()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: b.ID, Direction: 1})
 
 	if err != nil {
 		t.Fatalf("Reorder() error = %v", err)
-	}
-	if repo.SaveCalls != 2 {
-		t.Fatalf("SaveCalls = %d, want 2", repo.SaveCalls)
 	}
 	if len(resp.Sessions) != 3 {
 		t.Fatalf("len(resp.Sessions) = %d, want 3", len(resp.Sessions))
@@ -450,19 +457,16 @@ func TestSessionService_Reorder_MoveUp(t *testing.T) {
 	c := testutil.MakeSession("C", projectID)
 	c.Order = 3
 
-	repo := &mocks.MockSessionRepository{
-		GetResult:  b,
-		ListResult: []domain.Session{a, b, c},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, b.ID).Return(b, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Twice()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	resp, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: b.ID, Direction: -1})
 
 	if err != nil {
 		t.Fatalf("Reorder() error = %v", err)
-	}
-	if repo.SaveCalls != 2 {
-		t.Fatalf("SaveCalls = %d, want 2", repo.SaveCalls)
 	}
 	if len(resp.Sessions) != 3 {
 		t.Fatalf("len(resp.Sessions) = %d, want 3", len(resp.Sessions))
@@ -481,19 +485,15 @@ func TestSessionService_Reorder_BoundaryFirst_Up(t *testing.T) {
 	c := testutil.MakeSession("C", projectID)
 	c.Order = 3
 
-	repo := &mocks.MockSessionRepository{
-		GetResult:  a,
-		ListResult: []domain.Session{a, b, c},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, a.ID).Return(a, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: a.ID, Direction: -1})
 
 	if !errors.Is(err, errs.ErrNoOp) {
 		t.Fatalf("Reorder() error = %v, want %v", err, errs.ErrNoOp)
-	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SaveCalls = %d, want 0 (Save must not be called on boundary)", repo.SaveCalls)
 	}
 }
 
@@ -506,19 +506,15 @@ func TestSessionService_Reorder_BoundaryLast_Down(t *testing.T) {
 	c := testutil.MakeSession("C", projectID)
 	c.Order = 3
 
-	repo := &mocks.MockSessionRepository{
-		GetResult:  c,
-		ListResult: []domain.Session{a, b, c},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, c.ID).Return(c, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: c.ID, Direction: 1})
 
 	if !errors.Is(err, errs.ErrNoOp) {
 		t.Fatalf("Reorder() error = %v, want %v", err, errs.ErrNoOp)
-	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SaveCalls = %d, want 0 (Save must not be called on boundary)", repo.SaveCalls)
 	}
 }
 
@@ -526,34 +522,28 @@ func TestSessionService_Reorder_SingleSession(t *testing.T) {
 	a := testutil.MakeSession("A", uuid.New())
 	a.Order = 1
 
-	repo := &mocks.MockSessionRepository{
-		GetResult:  a,
-		ListResult: []domain.Session{a},
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, a.ID).Return(a, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a}, nil).Once()
 
+	svc := NewSessionService(repo, tmux, git, testLogger())
 	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: a.ID, Direction: 1})
 
 	if !errors.Is(err, errs.ErrNoOp) {
 		t.Fatalf("Reorder() error = %v, want %v", err, errs.ErrNoOp)
 	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SaveCalls = %d, want 0 (Save must not be called for single-session group)", repo.SaveCalls)
-	}
 }
 
 func TestSessionService_Reorder_NotFound(t *testing.T) {
-	repo := &mocks.MockSessionRepository{
-		GetErr: domain.ErrSessionNotFound,
-	}
-	svc := NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, testLogger())
+	repo, tmux, git := newSessionMocks(t)
+	missingID := uuid.New()
+	repo.EXPECT().Get(mock.Anything, missingID).
+		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
 
-	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: uuid.New(), Direction: 1})
+	svc := NewSessionService(repo, tmux, git, testLogger())
+	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: missingID, Direction: 1})
 
 	if !errors.Is(err, domain.ErrSessionNotFound) {
 		t.Fatalf("Reorder() error = %v, want %v", err, domain.ErrSessionNotFound)
-	}
-	if repo.SaveCalls != 0 {
-		t.Fatalf("SaveCalls = %d, want 0", repo.SaveCalls)
 	}
 }

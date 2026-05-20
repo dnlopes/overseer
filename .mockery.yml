@@ -1,0 +1,34 @@
+# Mockery v3 configuration.
+# Mocks are generated for the domain ports (interfaces) and used by service
+# and TUI unit tests. Re-run with `go generate ./...` (preferred) or `mockery`
+# whenever a port signature changes.
+#
+# `dir` uses {{.InterfaceDir}} (absolute path of the interface's package) so
+# the output location is stable no matter what working directory mockery is
+# invoked from. Joining `../../testutil/mocks` to an interface under
+# `internal/core/domain` lands on `internal/testutil/mocks`.
+#
+# Convention:
+#   - Output package: mocks
+#   - Output dir:     internal/testutil/mocks
+#   - File name:      mock_<InterfaceName>.go
+#   - Struct name:    Mock<InterfaceName>   (matches existing call sites)
+
+template: testify
+formatter: goimports
+log-level: info
+force-file-write: true
+
+dir: "{{.InterfaceDir}}/../../testutil/mocks"
+filename: "mock_{{.InterfaceName}}.go"
+pkgname: "mocks"
+structname: "Mock{{.InterfaceName}}"
+
+packages:
+  github.com/dnlopes/overseer/internal/core/domain:
+    interfaces:
+      SessionRepository:
+      ProjectRepository:
+      TmuxAdapter:
+      GitAdapter:
+      AgentLauncher:

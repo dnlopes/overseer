@@ -3,7 +3,7 @@
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/overseer
 
-.PHONY: build test test-integration update-golden lint run clean tidy qa-tmux help
+.PHONY: build test test-integration update-golden mocks lint run clean tidy qa-tmux help
 
 build: ## Build the overseer binary
 	mkdir -p $(BIN_DIR)
@@ -17,6 +17,10 @@ test-integration: ## Run integration tests
 
 update-golden: ## Update golden test files
 	go test -update ./...
+
+mocks: ## Regenerate testify mocks from domain ports (see .mockery.yml)
+	@command -v mockery >/dev/null 2>&1 || { echo "mockery not found in PATH; install with: go install github.com/vektra/mockery/v3@latest"; exit 1; }
+	go generate ./...
 
 lint: ## Run static analysis
 	golangci-lint run ./...

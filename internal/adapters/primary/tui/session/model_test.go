@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
@@ -18,7 +19,7 @@ import (
 
 func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -48,7 +49,7 @@ func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 func TestModel_RawGroupingModeRendersSessionsWithoutVirtualRows(t *testing.T) {
 	overseerID := uuid.New()
 	otherID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
 	model.groupingMode = sessionGroupingNone
 	model.SetSize(80, 20)
@@ -70,7 +71,7 @@ func TestModel_RawGroupingModeRendersSessionsWithoutVirtualRows(t *testing.T) {
 
 func TestModel_SelectionOnlyEmitsForSessionNodes(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetFocus(true)
 	alpha := testutil.MakeSession("alpha", overseerID)
@@ -97,8 +98,9 @@ func TestModel_SelectionOnlyEmitsForSessionNodes(t *testing.T) {
 
 func TestModel_LoadSessionsUsesRawSessions(t *testing.T) {
 	alpha := testutil.MakeSession("alpha", uuid.New())
-	repo := &mocks.MockSessionRepository{ListResult: []domain.Session{alpha}}
-	model := New(styles.New(), newSessionService(repo))
+	svc, repo := newSessionServiceWithRepo(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{alpha}, nil).Once()
+	model := New(styles.New(), svc)
 
 	msg := model.loadSessions()().(shared.SessionsLoadedMsg)
 
@@ -111,7 +113,7 @@ func TestModel_LoadSessionsUsesRawSessions(t *testing.T) {
 }
 
 func TestModel_SessionsLoadedWithUnassignedProjectShowsNoProjectGroup(t *testing.T) {
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetSize(80, 20)
 	model.SetFocus(true)
 	orphan := testutil.MakeSession("orphan", uuid.Nil)
@@ -126,7 +128,7 @@ func TestModel_SessionsLoadedWithUnassignedProjectShowsNoProjectGroup(t *testing
 
 func TestModel_GroupRowRendersDifferentlyWhenCursorMovesToIt(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -145,7 +147,7 @@ func TestModel_GroupRowRendersDifferentlyWhenCursorMovesToIt(t *testing.T) {
 
 func TestModel_RenderHasNoNumberPrefix(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -162,7 +164,7 @@ func TestModel_RenderHasNoNumberPrefix(t *testing.T) {
 func TestModel_NextGroupJumpsToNextProject(t *testing.T) {
 	overseerID := uuid.New()
 	otherID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -182,7 +184,7 @@ func TestModel_NextGroupJumpsToNextProject(t *testing.T) {
 func TestModel_PrevGroupJumpsToPreviousProject(t *testing.T) {
 	overseerID := uuid.New()
 	otherID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -200,7 +202,7 @@ func TestModel_PrevGroupJumpsToPreviousProject(t *testing.T) {
 
 func TestModel_CtrlDownMovesCursorFiveRows(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -227,7 +229,7 @@ func TestModel_CtrlDownMovesCursorFiveRows(t *testing.T) {
 
 func TestModel_CtrlUpMovesCursorFiveRowsClampedAtTop(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -249,11 +251,11 @@ func TestModel_ShiftDownReordersSelectedSession(t *testing.T) {
 	alpha.Order = 1
 	beta := testutil.MakeSession("beta", overseerID)
 	beta.Order = 2
-	repo := &mocks.MockSessionRepository{
-		ListResult: []domain.Session{alpha, beta},
-		GetResult:  alpha,
-	}
-	model := New(styles.New(), newSessionService(repo))
+	svc, repo := newSessionServiceWithRepo(t)
+	repo.EXPECT().Get(mock.Anything, alpha.ID).Return(alpha, nil).Once()
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{alpha, beta}, nil).Twice()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Twice()
+	model := New(styles.New(), svc)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -279,7 +281,7 @@ func TestModel_ShiftDownReordersSelectedSession(t *testing.T) {
 func TestModel_ShiftDownNoOpOnGroupRow(t *testing.T) {
 	overseerID := uuid.New()
 	alpha := testutil.MakeSession("alpha", overseerID)
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -299,7 +301,7 @@ func TestModel_SessionReorderedMsgRestoresCursorOnMovedSession(t *testing.T) {
 	alpha.Order = 1
 	beta := testutil.MakeSession("beta", overseerID)
 	beta.Order = 2
-	model := New(styles.New(), newSessionService(nil))
+	model := New(styles.New(), newSessionService(t))
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -330,11 +332,18 @@ func navigateToTop(t *testing.T, m tea.Model) tea.Model {
 	return m
 }
 
-func newSessionService(repo *mocks.MockSessionRepository) service.SessionService {
-	if repo == nil {
-		repo = &mocks.MockSessionRepository{}
-	}
-	return *service.NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, slog.Default())
+func newSessionService(t *testing.T) service.SessionService {
+	t.Helper()
+	svc, _ := newSessionServiceWithRepo(t)
+	return svc
+}
+
+func newSessionServiceWithRepo(t *testing.T) (service.SessionService, *mocks.MockSessionRepository) {
+	t.Helper()
+	repo := mocks.NewMockSessionRepository(t)
+	tmux := mocks.NewMockTmuxAdapter(t)
+	git := mocks.NewMockGitAdapter(t)
+	return *service.NewSessionService(repo, tmux, git, slog.Default()), repo
 }
 
 func keyPress(value string) tea.KeyPressMsg {

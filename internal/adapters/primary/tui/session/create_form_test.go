@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestCreateForm_DefaultsToNoProject(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(nil), nil)
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil)
 
 	if form.selectedProjectID() != uuid.Nil {
 		t.Fatalf("default selected project = %v, want uuid.Nil", form.selectedProjectID())
@@ -30,7 +31,7 @@ func TestCreateForm_DefaultsToNoProject(t *testing.T) {
 func TestCreateForm_TabFocusesProjectSelectorAndArrowsCycle(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
 	widgets := testutil.MakeProject("/repo/widgets", "Widgets")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(nil), []domain.Project{overseer, widgets})
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets})
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("right"))
@@ -47,7 +48,7 @@ func TestCreateForm_TabFocusesProjectSelectorAndArrowsCycle(t *testing.T) {
 func TestCreateForm_LeftFromNoneWrapsToLastProject(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
 	widgets := testutil.MakeProject("/repo/widgets", "Widgets")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(nil), []domain.Project{overseer, widgets})
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets})
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("left"))
@@ -60,8 +61,12 @@ func TestCreateForm_LeftFromNoneWrapsToLastProject(t *testing.T) {
 
 func TestCreateForm_SubmitCreatesSessionWithSelectedProject(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
-	repo := &mocks.MockSessionRepository{}
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(repo), []domain.Project{overseer})
+	svc, repo, tmux, git := newCreateFormSessionServiceWithMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "alpha").Return("tmux-alpha", nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, "main", "alpha").Return(nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+	form := NewCreateForm(styles.New(), svc, []domain.Project{overseer})
 
 	updated, _ := form.Update(formKeyPress("alpha"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -84,8 +89,12 @@ func TestCreateForm_SubmitCreatesSessionWithSelectedProject(t *testing.T) {
 }
 
 func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
-	repo := &mocks.MockSessionRepository{}
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(repo), nil)
+	svc, repo, tmux, git := newCreateFormSessionServiceWithMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, "orphan").Return("tmux-orphan", nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, "main", "orphan").Return(nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+	form := NewCreateForm(styles.New(), svc, nil)
 
 	updated, _ := form.Update(formKeyPress("orphan"))
 	_, cmd := updated.(CreateFormModel).Update(formKeyPress("enter"))
@@ -104,7 +113,7 @@ func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
 
 func TestCreateForm_ViewShowsCurrentProjectLabel(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(nil), []domain.Project{overseer})
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer})
 
 	view := form.View().Content
 	if !strings.Contains(view, "(none)") {
@@ -112,11 +121,18 @@ func TestCreateForm_ViewShowsCurrentProjectLabel(t *testing.T) {
 	}
 }
 
-func newCreateFormSessionService(repo *mocks.MockSessionRepository) service.SessionService {
-	if repo == nil {
-		repo = &mocks.MockSessionRepository{}
-	}
-	return *service.NewSessionService(repo, &mocks.MockTmuxAdapter{}, &mocks.MockGitAdapter{}, slog.Default())
+func newCreateFormSessionService(t *testing.T) service.SessionService {
+	t.Helper()
+	svc, _, _, _ := newCreateFormSessionServiceWithMocks(t)
+	return svc
+}
+
+func newCreateFormSessionServiceWithMocks(t *testing.T) (service.SessionService, *mocks.MockSessionRepository, *mocks.MockTmuxAdapter, *mocks.MockGitAdapter) {
+	t.Helper()
+	repo := mocks.NewMockSessionRepository(t)
+	tmux := mocks.NewMockTmuxAdapter(t)
+	git := mocks.NewMockGitAdapter(t)
+	return *service.NewSessionService(repo, tmux, git, slog.Default()), repo, tmux, git
 }
 
 func formKeyPress(value string) tea.KeyPressMsg {
