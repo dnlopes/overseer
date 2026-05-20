@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"sort"
 
@@ -12,17 +13,23 @@ import (
 
 	"github.com/dnlopes/overseer/internal/core/domain"
 	"github.com/dnlopes/overseer/internal/shared/errs"
+	"github.com/dnlopes/overseer/internal/shared/paths"
 )
 
+// defaultBaseBranch is the fork point used when CreateSessionRequest does
+// not specify one. Surfacing this as a request field is follow-up work.
+const defaultBaseBranch = "main"
+
 type SessionService struct {
-	repo   domain.SessionRepository
-	tmux   domain.TmuxAdapter
-	git    domain.GitAdapter
-	logger *slog.Logger
+	repo     domain.SessionRepository
+	projects domain.ProjectRepository
+	tmux     domain.TmuxAdapter
+	git      domain.GitAdapter
+	logger   *slog.Logger
 }
 
-func NewSessionService(repo domain.SessionRepository, tmux domain.TmuxAdapter, git domain.GitAdapter, logger *slog.Logger) *SessionService {
-	return &SessionService{repo: repo, tmux: tmux, git: git, logger: logger}
+func NewSessionService(repo domain.SessionRepository, projects domain.ProjectRepository, tmux domain.TmuxAdapter, git domain.GitAdapter, logger *slog.Logger) *SessionService {
+	return &SessionService{repo: repo, projects: projects, tmux: tmux, git: git, logger: logger}
 }
 
 // --- Create ---
@@ -40,6 +47,22 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 	sess, err := domain.NewSession(req.Name, req.ProjectID)
 	if err != nil {
 		return CreateSessionResponse{}, err
+	}
+
+	var repoPath string
+	if req.ProjectID != uuid.Nil {
+		project, err := s.projects.Get(ctx, req.ProjectID)
+		if err != nil {
+			return CreateSessionResponse{}, fmt.Errorf("lookup project: %w", err)
+		}
+		repoPath = project.Path
+		if err := sess.AssignWorktree(
+			paths.SessionWorktreePath(sess.ID),
+			defaultBaseBranch,
+			paths.SessionFeatureBranch(sess.ID),
+		); err != nil {
+			return CreateSessionResponse{}, fmt.Errorf("assign worktree: %w", err)
+		}
 	}
 
 	existing, err := s.repo.List(ctx)
@@ -61,11 +84,18 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 	}
 	sess.Order = nextOrder
 
-	if _, err := s.tmux.CreateSession(ctx, sess.ID.String(), "", ""); err != nil {
-		return CreateSessionResponse{}, fmt.Errorf("create tmux session: %w", err)
+	startDir, err := sessionStartDir(sess)
+	if err != nil {
+		return CreateSessionResponse{}, err
 	}
-	if err := s.git.CreateWorktree(ctx, "main", req.Name); err != nil {
-		return CreateSessionResponse{}, fmt.Errorf("create git worktree: %w", err)
+
+	if sess.HasWorktree() {
+		if err := s.git.CreateWorktree(ctx, repoPath, sess.BaseBranch, sess.FeatureBranch, sess.WorktreePath); err != nil {
+			return CreateSessionResponse{}, fmt.Errorf("create git worktree: %w", err)
+		}
+	}
+	if _, err := s.tmux.CreateSession(ctx, sess.ID.String(), startDir, ""); err != nil {
+		return CreateSessionResponse{}, fmt.Errorf("create tmux session: %w", err)
 	}
 	if err := s.repo.Save(ctx, sess); err != nil {
 		return CreateSessionResponse{}, fmt.Errorf("save session: %w", err)
@@ -192,11 +222,12 @@ func (s *SessionService) Reorder(ctx context.Context, req ReorderSessionRequest)
 	}
 
 	neighbor := idx + req.Direction
-	projectSessions[idx].Order, projectSessions[neighbor].Order =
-		projectSessions[neighbor].Order, projectSessions[idx].Order
+
+	projectSessions[idx].Order, projectSessions[neighbor].Order = projectSessions[neighbor].Order, projectSessions[idx].Order
+	projectSessions[idx].UpdatedAt = projectSessions[neighbor].UpdatedAt
 
 	if err := s.repo.Save(ctx, projectSessions[idx]); err != nil {
-		return ReorderSessionResponse{}, fmt.Errorf("save session: %w", err)
+		return ReorderSessionResponse{}, fmt.Errorf("save target session: %w", err)
 	}
 	if err := s.repo.Save(ctx, projectSessions[neighbor]); err != nil {
 		return ReorderSessionResponse{}, fmt.Errorf("save neighbor session: %w", err)
@@ -231,7 +262,11 @@ func (s *SessionService) Attach(ctx context.Context, req AttachSessionRequest) (
 	}
 
 	tmuxID := sess.ID.String()
-	if err := s.ensureTmuxSession(ctx, tmuxID); err != nil {
+	startDir, err := sessionStartDir(sess)
+	if err != nil {
+		return AttachSessionResponse{}, err
+	}
+	if err := s.ensureTmuxSession(ctx, tmuxID, startDir); err != nil {
 		return AttachSessionResponse{}, err
 	}
 
@@ -247,7 +282,7 @@ func (s *SessionService) Attach(ctx context.Context, req AttachSessionRequest) (
 	return AttachSessionResponse{Command: cmd}, nil
 }
 
-func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID string) error {
+func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID, startDir string) error {
 	_, err := s.tmux.GetSession(ctx, tmuxID)
 	if err == nil {
 		return nil
@@ -256,11 +291,25 @@ func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID string) e
 		return fmt.Errorf("inspect tmux session: %w", err)
 	}
 
-	if _, err := s.tmux.CreateSession(ctx, tmuxID, "", ""); err != nil {
+	if _, err := s.tmux.CreateSession(ctx, tmuxID, startDir, ""); err != nil {
 		return fmt.Errorf("recreate tmux session: %w", err)
 	}
 	s.logger.InfoContext(ctx, "tmux session recreated",
 		slog.String("id", tmuxID),
 	)
 	return nil
+}
+
+// sessionStartDir resolves the working directory a session's tmux session
+// should open in. Project-backed sessions use their worktree; project-less
+// sessions fall back to the user's home directory.
+func sessionStartDir(sess domain.Session) (string, error) {
+	if sess.HasWorktree() {
+		return sess.WorktreePath, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user home: %w", err)
+	}
+	return home, nil
 }

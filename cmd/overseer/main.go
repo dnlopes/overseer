@@ -13,7 +13,6 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/jobs"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
-	"github.com/dnlopes/overseer/internal/adapters/secondary/agent"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/git"
 	githubcli "github.com/dnlopes/overseer/internal/adapters/secondary/github"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/storage"
@@ -53,14 +52,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	gitStub := &git.Stub{}
-	agentStub := &agent.Stub{}
-	_ = agentStub
+	gitAdapter, err := git.New(log)
+	if err != nil {
+		log.Error("initialize git", "error", err)
+		os.Exit(1)
+	}
 
 	githubAdapter := githubcli.New(log)
 
-	sessionSvc := service.NewSessionService(store.Sessions(), tmuxAdapter, gitStub, log)
-	projectSvc := service.NewProjectService(store.Projects(), gitStub, log)
+	sessionSvc := service.NewSessionService(store.Sessions(), store.Projects(), tmuxAdapter, gitAdapter, log)
+	projectSvc := service.NewProjectService(store.Projects(), gitAdapter, log)
 	prSvc := service.NewPullRequestService(githubAdapter, log)
 
 	prJob := buildPullRequestJob(sessionSvc, projectSvc, prSvc)

@@ -341,9 +341,10 @@ func newSessionService(t *testing.T) service.SessionService {
 func newSessionServiceWithRepo(t *testing.T) (service.SessionService, *mocks.MockSessionRepository) {
 	t.Helper()
 	repo := mocks.NewMockSessionRepository(t)
+	projects := mocks.NewMockProjectRepository(t)
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
-	return *service.NewSessionService(repo, tmux, git, slog.Default()), repo
+	return *service.NewSessionService(repo, projects, tmux, git, slog.Default()), repo
 }
 
 func keyPress(value string) tea.KeyPressMsg {

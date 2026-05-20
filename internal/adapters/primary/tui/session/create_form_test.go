@@ -61,10 +61,11 @@ func TestCreateForm_LeftFromNoneWrapsToLastProject(t *testing.T) {
 
 func TestCreateForm_SubmitCreatesSessionWithSelectedProject(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
-	svc, repo, tmux, git := newCreateFormSessionServiceWithMocks(t)
+	svc, repo, projects, tmux, git := newCreateFormSessionServiceWithMocks(t)
+	projects.EXPECT().Get(mock.Anything, overseer.ID).Return(overseer, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "", "").Return("tmux-alpha", nil).Once()
-	git.EXPECT().CreateWorktree(mock.Anything, "main", "alpha").Return(nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, overseer.Path, "main", mock.Anything, mock.Anything).Return(nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	form := NewCreateForm(styles.New(), svc, []domain.Project{overseer})
 
@@ -89,10 +90,10 @@ func TestCreateForm_SubmitCreatesSessionWithSelectedProject(t *testing.T) {
 }
 
 func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
-	svc, repo, tmux, git := newCreateFormSessionServiceWithMocks(t)
+	t.Setenv("HOME", "/tmp/overseer-home")
+	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "", "").Return("tmux-orphan", nil).Once()
-	git.EXPECT().CreateWorktree(mock.Anything, "main", "orphan").Return(nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	form := NewCreateForm(styles.New(), svc, nil)
 
@@ -123,16 +124,17 @@ func TestCreateForm_ViewShowsCurrentProjectLabel(t *testing.T) {
 
 func newCreateFormSessionService(t *testing.T) service.SessionService {
 	t.Helper()
-	svc, _, _, _ := newCreateFormSessionServiceWithMocks(t)
+	svc, _, _, _, _ := newCreateFormSessionServiceWithMocks(t)
 	return svc
 }
 
-func newCreateFormSessionServiceWithMocks(t *testing.T) (service.SessionService, *mocks.MockSessionRepository, *mocks.MockTmuxAdapter, *mocks.MockGitAdapter) {
+func newCreateFormSessionServiceWithMocks(t *testing.T) (service.SessionService, *mocks.MockSessionRepository, *mocks.MockProjectRepository, *mocks.MockTmuxAdapter, *mocks.MockGitAdapter) {
 	t.Helper()
 	repo := mocks.NewMockSessionRepository(t)
+	projects := mocks.NewMockProjectRepository(t)
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
-	return *service.NewSessionService(repo, tmux, git, slog.Default()), repo, tmux, git
+	return *service.NewSessionService(repo, projects, tmux, git, slog.Default()), repo, projects, tmux, git
 }
 
 func formKeyPress(value string) tea.KeyPressMsg {

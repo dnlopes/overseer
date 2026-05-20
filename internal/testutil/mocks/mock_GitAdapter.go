@@ -38,16 +38,16 @@ func (_m *MockGitAdapter) EXPECT() *MockGitAdapter_Expecter {
 }
 
 // CreateWorktree provides a mock function for the type MockGitAdapter
-func (_mock *MockGitAdapter) CreateWorktree(ctx context.Context, baseBranch string, path string) error {
-	ret := _mock.Called(ctx, baseBranch, path)
+func (_mock *MockGitAdapter) CreateWorktree(ctx context.Context, repoPath string, baseBranch string, featureBranch string, worktreePath string) error {
+	ret := _mock.Called(ctx, repoPath, baseBranch, featureBranch, worktreePath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateWorktree")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = returnFunc(ctx, baseBranch, path)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
+		r0 = returnFunc(ctx, repoPath, baseBranch, featureBranch, worktreePath)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -61,13 +61,15 @@ type MockGitAdapter_CreateWorktree_Call struct {
 
 // CreateWorktree is a helper method to define mock.On call
 //   - ctx context.Context
+//   - repoPath string
 //   - baseBranch string
-//   - path string
-func (_e *MockGitAdapter_Expecter) CreateWorktree(ctx interface{}, baseBranch interface{}, path interface{}) *MockGitAdapter_CreateWorktree_Call {
-	return &MockGitAdapter_CreateWorktree_Call{Call: _e.mock.On("CreateWorktree", ctx, baseBranch, path)}
+//   - featureBranch string
+//   - worktreePath string
+func (_e *MockGitAdapter_Expecter) CreateWorktree(ctx interface{}, repoPath interface{}, baseBranch interface{}, featureBranch interface{}, worktreePath interface{}) *MockGitAdapter_CreateWorktree_Call {
+	return &MockGitAdapter_CreateWorktree_Call{Call: _e.mock.On("CreateWorktree", ctx, repoPath, baseBranch, featureBranch, worktreePath)}
 }
 
-func (_c *MockGitAdapter_CreateWorktree_Call) Run(run func(ctx context.Context, baseBranch string, path string)) *MockGitAdapter_CreateWorktree_Call {
+func (_c *MockGitAdapter_CreateWorktree_Call) Run(run func(ctx context.Context, repoPath string, baseBranch string, featureBranch string, worktreePath string)) *MockGitAdapter_CreateWorktree_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -81,10 +83,20 @@ func (_c *MockGitAdapter_CreateWorktree_Call) Run(run func(ctx context.Context, 
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -95,7 +107,7 @@ func (_c *MockGitAdapter_CreateWorktree_Call) Return(err error) *MockGitAdapter_
 	return _c
 }
 
-func (_c *MockGitAdapter_CreateWorktree_Call) RunAndReturn(run func(ctx context.Context, baseBranch string, path string) error) *MockGitAdapter_CreateWorktree_Call {
+func (_c *MockGitAdapter_CreateWorktree_Call) RunAndReturn(run func(ctx context.Context, repoPath string, baseBranch string, featureBranch string, worktreePath string) error) *MockGitAdapter_CreateWorktree_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -158,16 +170,16 @@ func (_c *MockGitAdapter_IsGitRepo_Call) RunAndReturn(run func(ctx context.Conte
 }
 
 // RemoveWorktree provides a mock function for the type MockGitAdapter
-func (_mock *MockGitAdapter) RemoveWorktree(ctx context.Context, path string) error {
-	ret := _mock.Called(ctx, path)
+func (_mock *MockGitAdapter) RemoveWorktree(ctx context.Context, repoPath string, worktreePath string) error {
+	ret := _mock.Called(ctx, repoPath, worktreePath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RemoveWorktree")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = returnFunc(ctx, path)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, repoPath, worktreePath)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -181,12 +193,13 @@ type MockGitAdapter_RemoveWorktree_Call struct {
 
 // RemoveWorktree is a helper method to define mock.On call
 //   - ctx context.Context
-//   - path string
-func (_e *MockGitAdapter_Expecter) RemoveWorktree(ctx interface{}, path interface{}) *MockGitAdapter_RemoveWorktree_Call {
-	return &MockGitAdapter_RemoveWorktree_Call{Call: _e.mock.On("RemoveWorktree", ctx, path)}
+//   - repoPath string
+//   - worktreePath string
+func (_e *MockGitAdapter_Expecter) RemoveWorktree(ctx interface{}, repoPath interface{}, worktreePath interface{}) *MockGitAdapter_RemoveWorktree_Call {
+	return &MockGitAdapter_RemoveWorktree_Call{Call: _e.mock.On("RemoveWorktree", ctx, repoPath, worktreePath)}
 }
 
-func (_c *MockGitAdapter_RemoveWorktree_Call) Run(run func(ctx context.Context, path string)) *MockGitAdapter_RemoveWorktree_Call {
+func (_c *MockGitAdapter_RemoveWorktree_Call) Run(run func(ctx context.Context, repoPath string, worktreePath string)) *MockGitAdapter_RemoveWorktree_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -196,9 +209,14 @@ func (_c *MockGitAdapter_RemoveWorktree_Call) Run(run func(ctx context.Context, 
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -209,7 +227,7 @@ func (_c *MockGitAdapter_RemoveWorktree_Call) Return(err error) *MockGitAdapter_
 	return _c
 }
 
-func (_c *MockGitAdapter_RemoveWorktree_Call) RunAndReturn(run func(ctx context.Context, path string) error) *MockGitAdapter_RemoveWorktree_Call {
+func (_c *MockGitAdapter_RemoveWorktree_Call) RunAndReturn(run func(ctx context.Context, repoPath string, worktreePath string) error) *MockGitAdapter_RemoveWorktree_Call {
 	_c.Call.Return(run)
 	return _c
 }

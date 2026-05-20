@@ -196,6 +196,72 @@ func TestSessionStore_PersistenceSurvivesReload(t *testing.T) {
 	}
 }
 
+func TestSessionStore_WorktreeFieldsSurviveReload(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "data.json")
+	logger := discardLogger()
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	sess := makeSession(t, "with-worktree", projectID)
+	if err := sess.AssignWorktree("/abs/worktrees/alpha", "main", "overseer/alpha"); err != nil {
+		t.Fatalf("AssignWorktree() error = %v", err)
+	}
+
+	store1, err := storage.New(path, logger)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if err := store1.Sessions().Save(ctx, sess); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	store2, err := storage.New(path, logger)
+	if err != nil {
+		t.Fatalf("New() (reload) error = %v", err)
+	}
+	got, err := store2.Sessions().Get(ctx, sess.ID)
+	if err != nil {
+		t.Fatalf("Get() after reload error = %v", err)
+	}
+	if got.WorktreePath != "/abs/worktrees/alpha" {
+		t.Errorf("Get() WorktreePath = %q, want %q", got.WorktreePath, "/abs/worktrees/alpha")
+	}
+	if got.BaseBranch != "main" {
+		t.Errorf("Get() BaseBranch = %q, want %q", got.BaseBranch, "main")
+	}
+	if got.FeatureBranch != "overseer/alpha" {
+		t.Errorf("Get() FeatureBranch = %q, want %q", got.FeatureBranch, "overseer/alpha")
+	}
+	if !got.HasWorktree() {
+		t.Errorf("Get() HasWorktree() = false, want true")
+	}
+}
+
+func TestSessionStore_ProjectLessSessionsHaveEmptyWorktreeAfterReload(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "data.json")
+	logger := discardLogger()
+	ctx := context.Background()
+
+	sess := makeSession(t, "orphan", uuid.Nil)
+
+	store1, _ := storage.New(path, logger)
+	if err := store1.Sessions().Save(ctx, sess); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	store2, _ := storage.New(path, logger)
+	got, err := store2.Sessions().Get(ctx, sess.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.HasWorktree() {
+		t.Errorf("Get() HasWorktree() = true, want false (project-less)")
+	}
+	if got.WorktreePath != "" || got.BaseBranch != "" || got.FeatureBranch != "" {
+		t.Errorf("Get() worktree fields = %q/%q/%q, want empty", got.WorktreePath, got.BaseBranch, got.FeatureBranch)
+	}
+}
+
 func TestSessionStore_DeletePersistsAcrossReload(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data.json")
 	logger := discardLogger()

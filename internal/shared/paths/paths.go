@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/google/uuid"
 )
 
 func DataDir() string {
@@ -49,6 +51,26 @@ func ConfigFile() string {
 
 func LogFile() string {
 	return filepath.Join(StateDir(), "overseer.log")
+}
+
+// WorktreeRoot is the directory under DataDir that holds per-session git
+// worktrees. Each session's worktree lives at WorktreeRoot()/<session-id>.
+func WorktreeRoot() string {
+	return filepath.Join(DataDir(), "worktrees")
+}
+
+// SessionWorktreePath returns the absolute worktree path for a session,
+// keyed by its UUID. Using the UUID (not the name) keeps the path stable
+// across renames.
+func SessionWorktreePath(sessionID uuid.UUID) string {
+	return filepath.Join(WorktreeRoot(), sessionID.String())
+}
+
+// SessionFeatureBranch returns the convention-based git branch name for a
+// session's worktree: "overseer/<session-id>". The session UUID guarantees
+// the branch name is unique within the repository.
+func SessionFeatureBranch(sessionID uuid.UUID) string {
+	return "overseer/" + sessionID.String()
 }
 
 func EnsureDir(dir string) error {

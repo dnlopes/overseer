@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestDataDirUsesXDGOverride(t *testing.T) {
@@ -66,6 +68,26 @@ func TestEnsureDirCreatesDirectory(t *testing.T) {
 	}
 	if !info.IsDir() {
 		t.Fatalf("EnsureDir() created non-directory %v", info.Mode())
+	}
+}
+
+func TestSessionWorktreePathUsesUUIDUnderWorktreeRoot(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/xdg-data")
+
+	sessionID := uuid.New()
+	got := SessionWorktreePath(sessionID)
+	want := filepath.Join("/tmp/xdg-data", "overseer", "worktrees", sessionID.String())
+	if got != want {
+		t.Fatalf("SessionWorktreePath() = %q, want %q", got, want)
+	}
+}
+
+func TestSessionFeatureBranchUsesOverseerPrefix(t *testing.T) {
+	sessionID := uuid.New()
+	got := SessionFeatureBranch(sessionID)
+	want := "overseer/" + sessionID.String()
+	if got != want {
+		t.Fatalf("SessionFeatureBranch() = %q, want %q", got, want)
 	}
 }
 

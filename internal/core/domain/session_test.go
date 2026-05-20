@@ -30,6 +30,9 @@ func TestNewSession_CreatesSession(t *testing.T) {
 	if s.Order != 0 {
 		t.Fatalf("NewSession() Order = %d, want 0", s.Order)
 	}
+	if s.HasWorktree() {
+		t.Fatalf("NewSession() HasWorktree() = true, want false (no worktree assigned)")
+	}
 	if s.CreatedAt.Before(before) {
 		t.Fatalf("NewSession() CreatedAt = %v, before creation start %v", s.CreatedAt, before)
 	}
@@ -95,6 +98,72 @@ func TestNewSession_AcceptsExactlyOneHundredCharacterName(t *testing.T) {
 	}
 }
 
+func TestAssignWorktree_PopulatesEnsemble(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	originalUpdated := s.UpdatedAt
+	time.Sleep(time.Millisecond)
+
+	if err := s.AssignWorktree("/abs/worktree", "main", "overseer/alpha"); err != nil {
+		t.Fatalf("AssignWorktree() error = %v", err)
+	}
+	if s.WorktreePath != "/abs/worktree" {
+		t.Fatalf("WorktreePath = %q, want %q", s.WorktreePath, "/abs/worktree")
+	}
+	if s.BaseBranch != "main" {
+		t.Fatalf("BaseBranch = %q, want %q", s.BaseBranch, "main")
+	}
+	if s.FeatureBranch != "overseer/alpha" {
+		t.Fatalf("FeatureBranch = %q, want %q", s.FeatureBranch, "overseer/alpha")
+	}
+	if !s.HasWorktree() {
+		t.Fatalf("HasWorktree() = false, want true")
+	}
+	if !s.UpdatedAt.After(originalUpdated) {
+		t.Fatalf("UpdatedAt = %v, want after %v", s.UpdatedAt, originalUpdated)
+	}
+}
+
+func TestAssignWorktree_TrimsFields(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	if err := s.AssignWorktree("  /abs/worktree  ", "  main  ", "  overseer/alpha  "); err != nil {
+		t.Fatalf("AssignWorktree() error = %v", err)
+	}
+	if s.WorktreePath != "/abs/worktree" || s.BaseBranch != "main" || s.FeatureBranch != "overseer/alpha" {
+		t.Fatalf("AssignWorktree did not trim fields: %+v", s)
+	}
+}
+
+func TestAssignWorktree_Validation(t *testing.T) {
+	tests := []struct {
+		name          string
+		worktreePath  string
+		baseBranch    string
+		featureBranch string
+		wantErr       error
+	}{
+		{name: "all empty", worktreePath: "", baseBranch: "", featureBranch: "", wantErr: ErrSessionWorktreeFieldsMismatch},
+		{name: "path only", worktreePath: "/abs/worktree", baseBranch: "", featureBranch: "", wantErr: ErrSessionWorktreeFieldsMismatch},
+		{name: "base branch only", worktreePath: "", baseBranch: "main", featureBranch: "", wantErr: ErrSessionWorktreeFieldsMismatch},
+		{name: "feature branch only", worktreePath: "", baseBranch: "", featureBranch: "overseer/alpha", wantErr: ErrSessionWorktreeFieldsMismatch},
+		{name: "missing feature", worktreePath: "/abs/worktree", baseBranch: "main", featureBranch: "", wantErr: ErrSessionWorktreeFieldsMismatch},
+		{name: "missing base", worktreePath: "/abs/worktree", baseBranch: "", featureBranch: "overseer/alpha", wantErr: ErrSessionWorktreeFieldsMismatch},
+		{name: "relative path", worktreePath: "relative/worktree", baseBranch: "main", featureBranch: "overseer/alpha", wantErr: ErrSessionWorktreePathNotAbsolute},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := NewSession("alpha", uuid.New())
+			err := s.AssignWorktree(tt.worktreePath, tt.baseBranch, tt.featureBranch)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("AssignWorktree() error = %v, want %v", err, tt.wantErr)
+			}
+			if s.HasWorktree() {
+				t.Fatalf("AssignWorktree failed but session still HasWorktree(): %+v", s)
+			}
+		})
+	}
+}
+
 func TestRename_UpdatesNameAndUpdatedAt(t *testing.T) {
 	s, _ := NewSession("alpha", uuid.New())
 	originalUpdated := s.UpdatedAt
@@ -144,4 +213,3 @@ func TestRename_TrimsAndValidates(t *testing.T) {
 		}
 	})
 }
-
