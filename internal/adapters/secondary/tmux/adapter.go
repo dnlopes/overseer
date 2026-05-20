@@ -145,7 +145,7 @@ func (a *Adapter) AttachCommand(_ context.Context, tmuxID string) (*exec.Cmd, er
 // can render the output with its original colors. "can't find session" stderr
 // is mapped to domain.ErrTmuxSessionNotFound by the run helper.
 func (a *Adapter) CapturePane(_ context.Context, tmuxID string) (string, error) {
-	stdout, err := a.run("capture-pane", "-p", "-e", "-t", tmuxID)
+	stdout, err := a.run("capture-pane", "-p", "-e", "-t", "="+tmuxID+":")
 	if err != nil {
 		return "", fmt.Errorf("tmux: capture pane %q: %w", tmuxID, err)
 	}
@@ -164,10 +164,11 @@ func (a *Adapter) CapturePane(_ context.Context, tmuxID string) (string, error) 
 // fit their terminal. Empirically the pane stays at the size we just set
 // until the next attach or resize, which is exactly what we want.
 func (a *Adapter) ResizeWindow(_ context.Context, tmuxID string, width, height int) error {
-	if _, err := a.run("resize-window", "-t", tmuxID, "-x", strconv.Itoa(width), "-y", strconv.Itoa(height)); err != nil {
+	target := "=" + tmuxID + ":"
+	if _, err := a.run("resize-window", "-t", target, "-x", strconv.Itoa(width), "-y", strconv.Itoa(height)); err != nil {
 		return fmt.Errorf("tmux: resize window %q to %dx%d: %w", tmuxID, width, height, err)
 	}
-	if _, err := a.run("set-window-option", "-t", tmuxID, "window-size", "latest"); err != nil {
+	if _, err := a.run("set-window-option", "-t", target, "window-size", "latest"); err != nil {
 		return fmt.Errorf("tmux: restore window-size on %q: %w", tmuxID, err)
 	}
 	return nil
