@@ -1,4 +1,4 @@
-// Package logger constructs the overseer slog.Logger wired to the XDG log file.
+// Package logger constructs the overseer slog.Logger wired to a configured log file.
 package logger
 
 import (
@@ -11,10 +11,10 @@ import (
 	"github.com/dnlopes/overseer/internal/shared/paths"
 )
 
-// New creates a slog.Logger that writes JSON to the XDG log file.
+// New creates a slog.Logger that writes JSON to logPath.
 // The caller must defer the returned io.Closer.
 // OVERSEER_LOG_LEVEL env var overrides the level parameter.
-func New(level string) (*slog.Logger, io.Closer, error) {
+func New(logPath, level string) (*slog.Logger, io.Closer, error) {
 	if envLevel := os.Getenv("OVERSEER_LOG_LEVEL"); envLevel != "" {
 		level = envLevel
 	}
@@ -24,7 +24,6 @@ func New(level string) (*slog.Logger, io.Closer, error) {
 		lvl = slog.LevelInfo
 	}
 
-	logPath := paths.LogFile()
 	if err := paths.EnsureDir(filepath.Dir(logPath)); err != nil {
 		return nil, nil, fmt.Errorf("logger: ensure dir: %w", err)
 	}

@@ -10,10 +10,10 @@ import (
 
 func TestLogger_WritesJSON(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", tmp)
 	t.Setenv("OVERSEER_LOG_LEVEL", "")
+	logPath := tmp + "/overseer/overseer.log"
 
-	log, closer, err := logger.New("info")
+	log, closer, err := logger.New(logPath, "info")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -22,7 +22,6 @@ func TestLogger_WritesJSON(t *testing.T) {
 	log.Info("hello")
 	closer.Close()
 
-	logPath := tmp + "/overseer/overseer.log"
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("read log file: %v", err)
@@ -43,10 +42,10 @@ func TestLogger_WritesJSON(t *testing.T) {
 
 func TestLogger_LevelEnv(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", tmp)
 	t.Setenv("OVERSEER_LOG_LEVEL", "debug")
+	logPath := tmp + "/overseer/overseer.log"
 
-	log, closer, err := logger.New("info")
+	log, closer, err := logger.New(logPath, "info")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -55,7 +54,6 @@ func TestLogger_LevelEnv(t *testing.T) {
 	log.Debug("debug-line")
 	closer.Close()
 
-	logPath := tmp + "/overseer/overseer.log"
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("read log file: %v", err)

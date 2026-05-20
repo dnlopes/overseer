@@ -20,21 +20,36 @@ import (
 // not specify one. Surfacing this as a request field is follow-up work.
 const defaultBaseBranch = "main"
 
-// defaultAgentCommand is the launcher used by AttachAgent when the session
-// has no AgentCommand assigned (i.e. it was created before agent attach
-// landed). Keeps pre-existing sessions usable without a forced migration.
-const defaultAgentCommand = "opencode"
-
 type SessionService struct {
-	repo     domain.SessionRepository
-	projects domain.ProjectRepository
-	tmux     domain.TmuxAdapter
-	git      domain.GitAdapter
-	logger   *slog.Logger
+	repo            domain.SessionRepository
+	projects        domain.ProjectRepository
+	tmux            domain.TmuxAdapter
+	git             domain.GitAdapter
+	pathsResolver   paths.Resolver
+	defaultLauncher domain.Launcher
+	logger          *slog.Logger
 }
 
-func NewSessionService(repo domain.SessionRepository, projects domain.ProjectRepository, tmux domain.TmuxAdapter, git domain.GitAdapter, logger *slog.Logger) *SessionService {
-	return &SessionService{repo: repo, projects: projects, tmux: tmux, git: git, logger: logger}
+// NewSessionService wires the session use-cases. defaultLauncher is used by
+// AttachAgent when a session's AgentCommand is empty (pre-launcher sessions).
+func NewSessionService(
+	repo domain.SessionRepository,
+	projects domain.ProjectRepository,
+	tmux domain.TmuxAdapter,
+	git domain.GitAdapter,
+	resolver paths.Resolver,
+	defaultLauncher domain.Launcher,
+	logger *slog.Logger,
+) *SessionService {
+	return &SessionService{
+		repo:            repo,
+		projects:        projects,
+		tmux:            tmux,
+		git:             git,
+		pathsResolver:   resolver,
+		defaultLauncher: defaultLauncher,
+		logger:          logger,
+	}
 }
 
 // --- Create ---
@@ -69,7 +84,7 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 		}
 		repoPath = project.Path
 		if err := sess.AssignWorktree(
-			paths.SessionWorktreePath(sess.ID),
+			s.pathsResolver.SessionWorktreePath(sess.ID),
 			defaultBaseBranch,
 			paths.SessionFeatureBranch(sess.ID),
 		); err != nil {
@@ -317,7 +332,10 @@ func (s *SessionService) AttachAgent(ctx context.Context, req AttachAgentRequest
 	}
 	agentCmd := sess.AgentCommand
 	if agentCmd == "" {
-		agentCmd = defaultAgentCommand
+		agentCmd = s.defaultLauncher.Command
+	}
+	if agentCmd == "" {
+		return AttachAgentResponse{}, domain.ErrSessionNoAgentCommandAvailable
 	}
 	if err := s.ensureTmuxSession(ctx, agentTmuxID, startDir, agentCmd); err != nil {
 		return AttachAgentResponse{}, err
@@ -364,11 +382,11 @@ func (s *SessionService) Delete(ctx context.Context, req DeleteSessionRequest) (
 	}
 
 	if sess.HasWorktree() {
-		if !sess.WorktreeIsInsideRoot(paths.WorktreeRoot()) {
+		if !sess.WorktreeIsInsideRoot(s.pathsResolver.WorktreeRoot()) {
 			s.logger.ErrorContext(ctx, "session worktree path outside managed root, refusing to delete",
 				slog.String("id", sess.ID.String()),
 				slog.String("worktree_path", sess.WorktreePath),
-				slog.String("worktree_root", paths.WorktreeRoot()),
+				slog.String("worktree_root", s.pathsResolver.WorktreeRoot()),
 			)
 			return DeleteSessionResponse{}, domain.ErrSessionWorktreePathOutsideRoot
 		}

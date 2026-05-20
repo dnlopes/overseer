@@ -168,4 +168,5 @@ var (
 	ErrSessionWorktreePathNotAbsolute = errors.New("session worktree path must be absolute")
 	ErrSessionWorktreePathOutsideRoot = errors.New("session worktree path is outside the managed worktree root")
 	ErrSessionEmptyAgentCommand       = errors.New("session agent command cannot be empty")
+	ErrSessionNoAgentCommandAvailable = errors.New("session has no agent command and no default launcher is configured")
 )

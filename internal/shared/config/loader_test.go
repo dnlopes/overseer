@@ -19,14 +19,25 @@ func TestDefault_ReturnsCorrectValues(t *testing.T) {
 	if cfg.Dashboard.MinHeight != 15 {
 		t.Errorf("MinHeight: want 15, got %d", cfg.Dashboard.MinHeight)
 	}
-	if cfg.Dashboard.FocusOnStart != "sessions" {
-		t.Errorf("FocusOnStart: want sessions, got %s", cfg.Dashboard.FocusOnStart)
-	}
 	if cfg.Logging.Level != "info" {
 		t.Errorf("Logging.Level: want info, got %s", cfg.Logging.Level)
 	}
-	if cfg.Storage.Path != "" {
-		t.Errorf("Storage.Path: want empty, got %s", cfg.Storage.Path)
+	if cfg.Storage.DataDir != "" {
+		t.Errorf("Storage.DataDir: want empty, got %s", cfg.Storage.DataDir)
+	}
+}
+
+func TestDefault_ShipsOpencodeAndClaudeLaunchers(t *testing.T) {
+	cfg := config.Default()
+
+	if len(cfg.Launchers) != 2 {
+		t.Fatalf("Launchers: want 2 entries, got %d", len(cfg.Launchers))
+	}
+	if cfg.Launchers[0].DisplayName != "OpenCode" || cfg.Launchers[0].Command != "opencode" {
+		t.Errorf("Launchers[0]: want {OpenCode, opencode}, got %+v", cfg.Launchers[0])
+	}
+	if cfg.Launchers[1].DisplayName != "Claude Code" || cfg.Launchers[1].Command != "claude" {
+		t.Errorf("Launchers[1]: want {Claude Code, claude}, got %+v", cfg.Launchers[1])
 	}
 }
 
@@ -37,8 +48,17 @@ func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
 	}
 
 	def := config.Default()
-	if cfg != def {
-		t.Errorf("expected default config, got: %+v", cfg)
+	if cfg.Dashboard != def.Dashboard {
+		t.Errorf("Dashboard: want %+v, got %+v", def.Dashboard, cfg.Dashboard)
+	}
+	if cfg.Logging != def.Logging {
+		t.Errorf("Logging: want %+v, got %+v", def.Logging, cfg.Logging)
+	}
+	if cfg.Storage != def.Storage {
+		t.Errorf("Storage: want %+v, got %+v", def.Storage, cfg.Storage)
+	}
+	if len(cfg.Launchers) != len(def.Launchers) {
+		t.Errorf("Launchers length: want %d, got %d", len(def.Launchers), len(cfg.Launchers))
 	}
 }
 
@@ -82,26 +102,8 @@ func TestLoad_PartialYAML_FillsDefaults(t *testing.T) {
 	if cfg.Dashboard.MinWidth != 60 {
 		t.Errorf("MinWidth: want 60, got %d", cfg.Dashboard.MinWidth)
 	}
-	if cfg.Dashboard.FocusOnStart != "sessions" {
-		t.Errorf("FocusOnStart: want sessions, got %s", cfg.Dashboard.FocusOnStart)
-	}
-}
-
-func TestLoad_InvalidFocusOnStart_ReturnsValidationError(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-
-	content := "dashboard:\n  focusOnStart: invalid_value\n"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err := config.Load(path)
-	if err == nil {
-		t.Fatal("expected validation error, got nil")
-	}
-	if !errs.Is(err, errs.ErrInvalidInput) {
-		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
+	if len(cfg.Launchers) != 2 {
+		t.Errorf("Launchers: want 2 defaults retained, got %d", len(cfg.Launchers))
 	}
 }
 
@@ -112,11 +114,15 @@ func TestLoad_ValidFullConfig_AllFieldsSet(t *testing.T) {
 	content := `dashboard:
   minWidth: 100
   minHeight: 30
-  focusOnStart: status
 logging:
   level: warn
 storage:
-  path: /tmp/overseer
+  dataDir: /tmp/overseer
+launchers:
+  - displayName: Custom Agent
+    command: my-agent --foo
+  - displayName: Plain Bash
+    command: bash
 `
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
@@ -133,14 +139,101 @@ storage:
 	if cfg.Dashboard.MinHeight != 30 {
 		t.Errorf("MinHeight: want 30, got %d", cfg.Dashboard.MinHeight)
 	}
-	if cfg.Dashboard.FocusOnStart != "status" {
-		t.Errorf("FocusOnStart: want status, got %s", cfg.Dashboard.FocusOnStart)
-	}
 	if cfg.Logging.Level != "warn" {
 		t.Errorf("Logging.Level: want warn, got %s", cfg.Logging.Level)
 	}
-	if cfg.Storage.Path != "/tmp/overseer" {
-		t.Errorf("Storage.Path: want /tmp/overseer, got %s", cfg.Storage.Path)
+	if cfg.Storage.DataDir != "/tmp/overseer" {
+		t.Errorf("Storage.DataDir: want /tmp/overseer, got %s", cfg.Storage.DataDir)
+	}
+	if len(cfg.Launchers) != 4 {
+		t.Fatalf("Launchers: want 4 entries, got %d", len(cfg.Launchers))
+	}
+	if cfg.Launchers[0].DisplayName != "OpenCode" || cfg.Launchers[0].Command != "opencode" {
+		t.Errorf("Launchers[0]: want {OpenCode, opencode}, got %+v", cfg.Launchers[0])
+	}
+	if cfg.Launchers[1].DisplayName != "Claude Code" || cfg.Launchers[1].Command != "claude" {
+		t.Errorf("Launchers[1]: want {Claude Code, claude}, got %+v", cfg.Launchers[1])
+	}
+	if cfg.Launchers[2].DisplayName != "Custom Agent" || cfg.Launchers[2].Command != "my-agent --foo" {
+		t.Errorf("Launchers[2]: want {Custom Agent, my-agent --foo}, got %+v", cfg.Launchers[2])
+	}
+	if cfg.Launchers[3].DisplayName != "Plain Bash" || cfg.Launchers[3].Command != "bash" {
+		t.Errorf("Launchers[3]: want {Plain Bash, bash}, got %+v", cfg.Launchers[3])
+	}
+}
+
+func TestLoad_RelativeDataDir_RejectedWithInvalidInput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "storage:\n  dataDir: ./relative/path\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.Load(path)
+	if err == nil {
+		t.Fatal("expected error for relative DataDir, got nil")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
+	}
+}
+
+func TestLoad_ExplicitEmptyLaunchers_KeepsDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "launchers: []\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("explicit empty launchers should load cleanly, got: %v", err)
+	}
+	if len(cfg.Launchers) != 2 {
+		t.Errorf("Launchers: want 2 defaults, got %d", len(cfg.Launchers))
+	}
+}
+
+func TestLoad_LauncherFieldOmitted_KeepsDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "logging:\n  level: debug\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Launchers) != 2 {
+		t.Errorf("Launchers: omitting field should preserve 2 defaults, got %d", len(cfg.Launchers))
+	}
+}
+
+func TestLoad_LauncherMissingCommand_RejectedWithInvalidInput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := `launchers:
+  - displayName: NoCommand
+    command: ""
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.Load(path)
+	if err == nil {
+		t.Fatal("expected error for empty launcher command, got nil")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
 	}
 }
 
@@ -153,13 +246,51 @@ func TestValidate_InvalidMinWidth_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestValidate_AllValidFocusValues(t *testing.T) {
-	for _, focus := range []string{"sessions", "status", "preview"} {
-		cfg := config.Default()
-		cfg.Dashboard.FocusOnStart = focus
+func TestValidate_InvalidMinHeight_ReturnsError(t *testing.T) {
+	cfg := config.Default()
+	cfg.Dashboard.MinHeight = 0
 
-		if err := cfg.Validate(); err != nil {
-			t.Errorf("FocusOnStart=%q: unexpected error: %v", focus, err)
-		}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for MinHeight=0, got nil")
+	}
+}
+
+func TestDomainLaunchers_ConvertsValidEntries(t *testing.T) {
+	cfg := config.Config{
+		Launchers: []config.LauncherConfig{
+			{DisplayName: "OpenCode", Command: "opencode"},
+			{DisplayName: "Claude", Command: "claude --debug"},
+		},
+	}
+
+	got, err := cfg.DomainLaunchers()
+	if err != nil {
+		t.Fatalf("DomainLaunchers() error = %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("DomainLaunchers() length = %d, want 2", len(got))
+	}
+	if got[0].DisplayName != "OpenCode" || got[0].Command != "opencode" {
+		t.Errorf("DomainLaunchers()[0] = %+v, want {OpenCode, opencode}", got[0])
+	}
+	if got[1].DisplayName != "Claude" || got[1].Command != "claude --debug" {
+		t.Errorf("DomainLaunchers()[1] = %+v, want {Claude, claude --debug}", got[1])
+	}
+}
+
+func TestDomainLaunchers_InvalidEntry_ReturnsInvalidInput(t *testing.T) {
+	cfg := config.Config{
+		Launchers: []config.LauncherConfig{
+			{DisplayName: "OK", Command: "ok"},
+			{DisplayName: "", Command: "x"},
+		},
+	}
+
+	_, err := cfg.DomainLaunchers()
+	if err == nil {
+		t.Fatal("expected error for empty display name, got nil")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
 	}
 }

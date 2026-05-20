@@ -13,6 +13,7 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	"github.com/dnlopes/overseer/internal/core/domain"
 	"github.com/dnlopes/overseer/internal/core/service"
+	"github.com/dnlopes/overseer/internal/shared/paths"
 	"github.com/dnlopes/overseer/internal/testutil"
 	"github.com/dnlopes/overseer/internal/testutil/mocks"
 )
@@ -407,7 +408,8 @@ func newSessionServiceWithRepo(t *testing.T) (service.SessionService, *mocks.Moc
 	projects := mocks.NewMockProjectRepository(t)
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
-	return *service.NewSessionService(repo, projects, tmux, git, slog.Default()), repo
+	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode")
+	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, slog.Default()), repo
 }
 
 func keyPress(value string) tea.KeyPressMsg {

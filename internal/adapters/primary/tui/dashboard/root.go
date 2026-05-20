@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+	"fmt"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -48,14 +49,24 @@ type Model struct {
 
 	width           int
 	height          int
+	minWidth        int
+	minHeight       int
 	tooSmall        bool
 	leftPaneFocused bool
 	styles          *styles.Styles
 	sessionsService service.SessionService
 	projectsService service.ProjectService
+	launchers       []domain.Launcher
 }
 
-func New(styles *styles.Styles, sessionsService service.SessionService, projectsService service.ProjectService, scheduler jobs.Model) Model {
+func New(
+	styles *styles.Styles,
+	sessionsService service.SessionService,
+	projectsService service.ProjectService,
+	scheduler jobs.Model,
+	launchers []domain.Launcher,
+	minWidth, minHeight int,
+) Model {
 	sessionsModel := sessionui.New(styles, sessionsService)
 	projectsModel := projectui.New(styles, projectsService)
 	left := leftpane.New(styles, sessionsModel, projectsModel)
@@ -69,6 +80,9 @@ func New(styles *styles.Styles, sessionsService service.SessionService, projects
 		scheduler:       scheduler,
 		sessionsService: sessionsService,
 		projectsService: projectsService,
+		launchers:       launchers,
+		minWidth:        minWidth,
+		minHeight:       minHeight,
 		leftPaneFocused: true,
 		prStatuses:      make(map[uuid.UUID]shared.PRStatusUpdatedMsg),
 	}
@@ -175,7 +189,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 	if m.leftPaneFocused {
 		if m.leftPane.SessionsActive() && key.Matches(msg, newSessionKeyBinding) {
-			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.cachedProjects)
+			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.cachedProjects, m.launchers)
 			m.activePopup = popupNewSession
 			return m.createForm.Init(), true
 		}
@@ -279,7 +293,7 @@ func (m *Model) refreshProjectNameLookup() {
 
 func (m Model) View() tea.View {
 	if m.tooSmall {
-		msg := m.styles.TooSmall.Message.Render("Terminal too small. Minimum size: 60x15.")
+		msg := m.styles.TooSmall.Message.Render(fmt.Sprintf("Terminal too small. Minimum size: %dx%d.", m.minWidth, m.minHeight))
 		return tea.NewView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, msg))
 	}
 	if m.activePopup != popupNone {
@@ -318,7 +332,7 @@ func (m Model) popupView() string {
 func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
-	m.tooSmall = m.width < 60 || m.height < 15
+	m.tooSmall = m.width < m.minWidth || m.height < m.minHeight
 
 	leftWidth := m.width * SessionsListWidthPercent / 100
 	rightWidth := m.width - leftWidth
