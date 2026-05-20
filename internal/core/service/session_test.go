@@ -66,6 +66,7 @@ func TestSessionService_Create_HappyPath(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -112,6 +113,7 @@ func TestSessionService_Create_WithoutProjectShellsIntoHome(t *testing.T) {
 
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").Return("tmux-orphan-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -170,6 +172,7 @@ func TestSessionService_Create_DuplicateNameAcrossProjectsAllowed(t *testing.T) 
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
 	svc := NewSessionService(repo, projects, tmux, git, testLogger())
@@ -208,6 +211,7 @@ func TestSessionService_Create_OrderIncrement(t *testing.T) {
 		Return([]domain.Session{first, second, otherProject}, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-gamma", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-gamma-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -225,6 +229,25 @@ func TestSessionService_Create_OrderIncrement(t *testing.T) {
 	}
 	if savedSession.Order != 3 {
 		t.Fatalf("SessionRepository.Save Order = %d, want 3", savedSession.Order)
+	}
+}
+
+func TestSessionService_Create_AgentTmuxErrorKillsShellAndPropagates(t *testing.T) {
+	t.Setenv("HOME", "/tmp/overseer-home")
+	tmuxErr := errors.New("tmux out of capacity")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").
+		Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").
+		Return("", tmuxErr).Once()
+	tmux.EXPECT().KillSession(mock.Anything, testutil.UUIDString()).Return(nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: uuid.Nil})
+
+	if err == nil || !errors.Is(err, tmuxErr) {
+		t.Fatalf("Create() error = %v, want wrapped %v", err, tmuxErr)
 	}
 }
 
@@ -285,6 +308,7 @@ func TestSessionService_Create_FirstSessionOrder(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{otherProject}, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
 	svc := NewSessionService(repo, projects, tmux, git, testLogger())
@@ -766,6 +790,8 @@ func TestSessionService_Create_WithAgentCommand(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").
 		Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "claude").
+		Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -988,5 +1014,153 @@ func TestSessionService_AttachAgent_TmuxAdapterErrorWrapped(t *testing.T) {
 
 	if err == nil || !errors.Is(err, adapterErr) {
 		t.Fatalf("AttachAgent() error = %v, want wrapped %v", err, adapterErr)
+	}
+}
+
+func TestSessionService_PreviewSession_Shell_ReturnsContent(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()).Return("shell content", nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
+
+	if err != nil {
+		t.Fatalf("PreviewSession() error = %v", err)
+	}
+	if !resp.SessionReady {
+		t.Errorf("PreviewSession() SessionReady = false, want true")
+	}
+	if resp.Content != "shell content" {
+		t.Errorf("PreviewSession() Content = %q, want %q", resp.Content, "shell content")
+	}
+}
+
+func TestSessionService_PreviewSession_Agent_TargetsAgentTmuxID(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	wantTmuxID := sess.ID.String() + "-agent"
+	tmux.EXPECT().CapturePane(mock.Anything, wantTmuxID).Return("agent content", nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindAgent})
+
+	if err != nil {
+		t.Fatalf("PreviewSession() error = %v", err)
+	}
+	if !resp.SessionReady {
+		t.Errorf("PreviewSession() SessionReady = false, want true")
+	}
+	if resp.Content != "agent content" {
+		t.Errorf("PreviewSession() Content = %q, want %q", resp.Content, "agent content")
+	}
+}
+
+func TestSessionService_PreviewSession_TmuxSessionMissing_ReturnsNotReady(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()+"-agent").
+		Return("", domain.ErrTmuxSessionNotFound).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindAgent})
+
+	if err != nil {
+		t.Fatalf("PreviewSession() error = %v, want nil for not-found", err)
+	}
+	if resp.SessionReady {
+		t.Errorf("PreviewSession() SessionReady = true, want false")
+	}
+	if resp.Content != "" {
+		t.Errorf("PreviewSession() Content = %q, want empty", resp.Content)
+	}
+}
+
+func TestSessionService_PreviewSession_SessionNotFound(t *testing.T) {
+	missingID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, missingID).
+		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: missingID, Kind: PreviewKindShell})
+
+	if !errors.Is(err, domain.ErrSessionNotFound) {
+		t.Fatalf("PreviewSession() error = %v, want %v", err, domain.ErrSessionNotFound)
+	}
+}
+
+func TestSessionService_PreviewSession_TmuxAdapterErrorWrapped(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	adapterErr := errors.New("tmux server crashed")
+	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()).Return("", adapterErr).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
+
+	if err == nil || !errors.Is(err, adapterErr) {
+		t.Fatalf("PreviewSession() error = %v, want wrapped %v", err, adapterErr)
+	}
+}
+
+func TestSessionService_PreviewSession_WithDimensions_ResizesBeforeCapture(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().ResizeWindow(mock.Anything, sess.ID.String(), 120, 40).Return(nil).Once()
+	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()).Return("resized content", nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{
+		ID: sess.ID, Kind: PreviewKindShell, Width: 120, Height: 40,
+	})
+
+	if err != nil {
+		t.Fatalf("PreviewSession() error = %v", err)
+	}
+	if resp.Content != "resized content" {
+		t.Errorf("PreviewSession() Content = %q, want %q", resp.Content, "resized content")
+	}
+}
+
+func TestSessionService_PreviewSession_ResizeNotFound_ReturnsNotReady(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().ResizeWindow(mock.Anything, sess.ID.String()+"-agent", 80, 24).
+		Return(domain.ErrTmuxSessionNotFound).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{
+		ID: sess.ID, Kind: PreviewKindAgent, Width: 80, Height: 24,
+	})
+
+	if err != nil {
+		t.Fatalf("PreviewSession() error = %v, want nil for not-found", err)
+	}
+	if resp.SessionReady {
+		t.Errorf("PreviewSession() SessionReady = true, want false")
+	}
+}
+
+func TestSessionService_PreviewSession_ResizeErrorWrapped(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	resizeErr := errors.New("resize forbidden")
+	tmux.EXPECT().ResizeWindow(mock.Anything, sess.ID.String(), 80, 24).Return(resizeErr).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{
+		ID: sess.ID, Kind: PreviewKindShell, Width: 80, Height: 24,
+	})
+
+	if err == nil || !errors.Is(err, resizeErr) {
+		t.Fatalf("PreviewSession() error = %v, want wrapped %v", err, resizeErr)
 	}
 }

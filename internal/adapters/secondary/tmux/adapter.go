@@ -140,6 +140,39 @@ func (a *Adapter) AttachCommand(_ context.Context, tmuxID string) (*exec.Cmd, er
 	return cmd, nil
 }
 
+// CapturePane returns the current visible content of the active pane of the
+// named tmux session. The `-e` flag preserves ANSI escape sequences so callers
+// can render the output with its original colors. "can't find session" stderr
+// is mapped to domain.ErrTmuxSessionNotFound by the run helper.
+func (a *Adapter) CapturePane(_ context.Context, tmuxID string) (string, error) {
+	stdout, err := a.run("capture-pane", "-p", "-e", "-t", tmuxID)
+	if err != nil {
+		return "", fmt.Errorf("tmux: capture pane %q: %w", tmuxID, err)
+	}
+	return stdout, nil
+}
+
+// ResizeWindow resizes the named tmux session's window to width×height cells.
+// tmux sends SIGWINCH to the foreground process so the terminal UI redraws on
+// the new canvas; without this, detached agent sessions stay frozen at tmux's
+// default size and render small/collapsed layouts inside a wider preview.
+//
+// resize-window with explicit -x/-y silently switches window-size to "manual",
+// which would freeze the pane at this preview size even when a larger client
+// later attaches — the user sees their app boxed inside dotted padding. We
+// immediately restore "latest" so attaching clients can grow the window to
+// fit their terminal. Empirically the pane stays at the size we just set
+// until the next attach or resize, which is exactly what we want.
+func (a *Adapter) ResizeWindow(_ context.Context, tmuxID string, width, height int) error {
+	if _, err := a.run("resize-window", "-t", tmuxID, "-x", strconv.Itoa(width), "-y", strconv.Itoa(height)); err != nil {
+		return fmt.Errorf("tmux: resize window %q to %dx%d: %w", tmuxID, width, height, err)
+	}
+	if _, err := a.run("set-window-option", "-t", tmuxID, "window-size", "latest"); err != nil {
+		return fmt.Errorf("tmux: restore window-size on %q: %w", tmuxID, err)
+	}
+	return nil
+}
+
 // errTmuxNoServer is returned by run when tmux reports that no server is running.
 var errTmuxNoServer = errors.New("tmux: no server running")
 
@@ -157,7 +190,9 @@ func (a *Adapter) run(args ...string) (string, error) {
 	if errors.As(err, &exitErr) {
 		stderr := strings.TrimSpace(string(exitErr.Stderr))
 		switch {
-		case strings.Contains(stderr, "can't find session"):
+		case strings.Contains(stderr, "can't find session"),
+			strings.Contains(stderr, "can't find pane"),
+			strings.Contains(stderr, "can't find window"):
 			return "", domain.ErrTmuxSessionNotFound
 		case strings.Contains(stderr, "no server running"):
 			return "", errTmuxNoServer

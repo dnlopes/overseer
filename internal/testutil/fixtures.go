@@ -1,6 +1,8 @@
 package testutil
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 
@@ -44,6 +46,18 @@ func MakeProject(path, name string) domain.Project {
 func UUIDString() interface{} {
 	return mock.MatchedBy(func(s string) bool {
 		_, err := uuid.Parse(s)
+		return err == nil
+	})
+}
+
+// AgentTmuxIDString matches strings of the form "<uuid>-agent", used by the
+// service to name the tmux session that hosts the agent process.
+func AgentTmuxIDString() interface{} {
+	return mock.MatchedBy(func(s string) bool {
+		if !strings.HasSuffix(s, "-agent") {
+			return false
+		}
+		_, err := uuid.Parse(strings.TrimSuffix(s, "-agent"))
 		return err == nil
 	})
 }

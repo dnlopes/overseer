@@ -24,6 +24,8 @@ type Stub struct {
 	ListSessionsCalls  int
 	AttachSessionCalls int
 	AttachCommandCalls int
+	CapturePaneCalls   int
+	ResizeWindowCalls  int
 
 	LastStartDir     string
 	LastShellCommand string
@@ -72,4 +74,17 @@ func (s *Stub) AttachSession(_ context.Context, _ string) error {
 func (s *Stub) AttachCommand(_ context.Context, _ string) (*exec.Cmd, error) {
 	s.AttachCommandCalls++
 	return exec.Command("true"), nil
+}
+
+// CapturePane records the call and returns a canned placeholder string so tests
+// can assert content was rendered without invoking a real tmux server.
+func (s *Stub) CapturePane(_ context.Context, _ string) (string, error) {
+	s.CapturePaneCalls++
+	return "stub capture-pane output", nil
+}
+
+// ResizeWindow records the call without touching any real tmux session.
+func (s *Stub) ResizeWindow(_ context.Context, _ string, _, _ int) error {
+	s.ResizeWindowCalls++
+	return nil
 }

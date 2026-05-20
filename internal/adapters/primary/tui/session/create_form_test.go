@@ -67,6 +67,7 @@ func TestCreateForm_SubmitCreatesSessionWithSelectedProject(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, overseer.Path, "main", mock.Anything, mock.Anything).Return(nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	form := NewCreateForm(styles.New(), svc, []domain.Project{overseer})
 
@@ -95,6 +96,7 @@ func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
 	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").Return("tmux-orphan-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	form := NewCreateForm(styles.New(), svc, nil)
 
@@ -174,6 +176,7 @@ func TestCreateForm_SubmitWithDefaultOpencodeSendsOpencodeCommand(t *testing.T) 
 	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").Return("tmux-orphan-agent", nil).Once()
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
@@ -197,6 +200,7 @@ func TestCreateForm_SubmitWithClaudeSendsClaudeCommand(t *testing.T) {
 	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "claude").Return("tmux-orphan-agent", nil).Once()
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).

@@ -164,6 +164,72 @@ func (_c *MockTmuxAdapter_AttachSession_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// CapturePane provides a mock function for the type MockTmuxAdapter
+func (_mock *MockTmuxAdapter) CapturePane(ctx context.Context, tmuxID string) (string, error) {
+	ret := _mock.Called(ctx, tmuxID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CapturePane")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return returnFunc(ctx, tmuxID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = returnFunc(ctx, tmuxID)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, tmuxID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockTmuxAdapter_CapturePane_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CapturePane'
+type MockTmuxAdapter_CapturePane_Call struct {
+	*mock.Call
+}
+
+// CapturePane is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tmuxID string
+func (_e *MockTmuxAdapter_Expecter) CapturePane(ctx interface{}, tmuxID interface{}) *MockTmuxAdapter_CapturePane_Call {
+	return &MockTmuxAdapter_CapturePane_Call{Call: _e.mock.On("CapturePane", ctx, tmuxID)}
+}
+
+func (_c *MockTmuxAdapter_CapturePane_Call) Run(run func(ctx context.Context, tmuxID string)) *MockTmuxAdapter_CapturePane_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockTmuxAdapter_CapturePane_Call) Return(s string, err error) *MockTmuxAdapter_CapturePane_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockTmuxAdapter_CapturePane_Call) RunAndReturn(run func(ctx context.Context, tmuxID string) (string, error)) *MockTmuxAdapter_CapturePane_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateSession provides a mock function for the type MockTmuxAdapter
 func (_mock *MockTmuxAdapter) CreateSession(ctx context.Context, name string, startDir string, shellCommand string) (string, error) {
 	ret := _mock.Called(ctx, name, startDir, shellCommand)
@@ -423,6 +489,75 @@ func (_c *MockTmuxAdapter_ListSessions_Call) Return(tmuxSessions []domain.TmuxSe
 }
 
 func (_c *MockTmuxAdapter_ListSessions_Call) RunAndReturn(run func(ctx context.Context) ([]domain.TmuxSession, error)) *MockTmuxAdapter_ListSessions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ResizeWindow provides a mock function for the type MockTmuxAdapter
+func (_mock *MockTmuxAdapter) ResizeWindow(ctx context.Context, tmuxID string, width int, height int) error {
+	ret := _mock.Called(ctx, tmuxID, width, height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResizeWindow")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int, int) error); ok {
+		r0 = returnFunc(ctx, tmuxID, width, height)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockTmuxAdapter_ResizeWindow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResizeWindow'
+type MockTmuxAdapter_ResizeWindow_Call struct {
+	*mock.Call
+}
+
+// ResizeWindow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tmuxID string
+//   - width int
+//   - height int
+func (_e *MockTmuxAdapter_Expecter) ResizeWindow(ctx interface{}, tmuxID interface{}, width interface{}, height interface{}) *MockTmuxAdapter_ResizeWindow_Call {
+	return &MockTmuxAdapter_ResizeWindow_Call{Call: _e.mock.On("ResizeWindow", ctx, tmuxID, width, height)}
+}
+
+func (_c *MockTmuxAdapter_ResizeWindow_Call) Run(run func(ctx context.Context, tmuxID string, width int, height int)) *MockTmuxAdapter_ResizeWindow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockTmuxAdapter_ResizeWindow_Call) Return(err error) *MockTmuxAdapter_ResizeWindow_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockTmuxAdapter_ResizeWindow_Call) RunAndReturn(run func(ctx context.Context, tmuxID string, width int, height int) error) *MockTmuxAdapter_ResizeWindow_Call {
 	_c.Call.Return(run)
 	return _c
 }

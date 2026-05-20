@@ -179,3 +179,84 @@ func TestIntegration_Adapter_CreateSession_ShellCommandIsApplied(t *testing.T) {
 		t.Errorf("pane_start_command = %q, want %q", got, "sleep 30")
 	}
 }
+
+func TestIntegration_Adapter_CapturePane_ReturnsContent(t *testing.T) {
+	a := newAdapter(t)
+	ctx := context.Background()
+	name := uniqueSessionName(t)
+	marker := "overseer-capture-pane-marker-" + uuid.NewString()[:8]
+
+	startCmd := fmt.Sprintf("sh -c 'echo %s; tail -f /dev/null'", marker)
+	tmuxID, err := a.CreateSession(ctx, name, "", startCmd)
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	t.Cleanup(func() { _ = a.KillSession(ctx, tmuxID) })
+
+	// Poll capture-pane until the marker appears or the deadline expires. The
+	// echo runs as soon as the shell starts, but tmux schedules pane redraws
+	// asynchronously so the marker is not guaranteed on the first capture.
+	deadline := time.Now().Add(2 * time.Second)
+	var got string
+	for time.Now().Before(deadline) {
+		got, err = a.CapturePane(ctx, tmuxID)
+		if err != nil {
+			t.Fatalf("CapturePane() error = %v", err)
+		}
+		if strings.Contains(got, marker) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Errorf("CapturePane() output did not contain marker %q within deadline; got %q", marker, got)
+}
+
+func TestIntegration_Adapter_CapturePane_UnknownReturnsNotFound(t *testing.T) {
+	a := newAdapter(t)
+
+	_, err := a.CapturePane(context.Background(), uniqueSessionName(t))
+	if !errors.Is(err, domain.ErrTmuxSessionNotFound) {
+		t.Errorf("CapturePane() unknown error = %v, want %v", err, domain.ErrTmuxSessionNotFound)
+	}
+}
+
+func TestIntegration_Adapter_ResizeWindow_AppliesAndPreservesAutoSizing(t *testing.T) {
+	a := newAdapter(t)
+	ctx := context.Background()
+	name := uniqueSessionName(t)
+
+	tmuxID, err := a.CreateSession(ctx, name, "", "")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	t.Cleanup(func() { _ = a.KillSession(ctx, tmuxID) })
+
+	if err := a.ResizeWindow(ctx, tmuxID, 140, 50); err != nil {
+		t.Fatalf("ResizeWindow() error = %v", err)
+	}
+
+	dims, err := exec.Command("tmux", "display-message", "-p", "-t", tmuxID, "#{window_width}x#{window_height}").Output()
+	if err != nil {
+		t.Fatalf("display-message error = %v", err)
+	}
+	if got := strings.TrimSpace(string(dims)); got != "140x50" {
+		t.Errorf("pane dimensions = %q, want %q", got, "140x50")
+	}
+
+	opt, err := exec.Command("tmux", "show-window-options", "-t", tmuxID, "window-size").Output()
+	if err != nil {
+		t.Fatalf("show-window-options error = %v", err)
+	}
+	if got := strings.TrimSpace(string(opt)); got != "window-size latest" {
+		t.Errorf("window-size option = %q, want %q (so attaching clients can grow the pane)", got, "window-size latest")
+	}
+}
+
+func TestIntegration_Adapter_ResizeWindow_UnknownReturnsNotFound(t *testing.T) {
+	a := newAdapter(t)
+
+	err := a.ResizeWindow(context.Background(), uniqueSessionName(t), 80, 24)
+	if !errors.Is(err, domain.ErrTmuxSessionNotFound) {
+		t.Errorf("ResizeWindow() unknown error = %v, want %v", err, domain.ErrTmuxSessionNotFound)
+	}
+}

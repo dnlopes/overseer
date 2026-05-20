@@ -3,6 +3,7 @@ package dashboard
 import (
 	"charm.land/bubbles/v2/key"
 
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/inspector"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/leftpane"
 )
 
@@ -15,7 +16,7 @@ var (
 	attachShellKeyBinding = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "attach shell"))
 	attachAgentKeyBinding = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "attach agent"))
 
-	sessionsTabKeyBindings = []key.Binding{newSessionKeyBinding, attachShellKeyBinding, attachAgentKeyBinding, leftpane.SessionsTabBinding(), leftpane.ProjectsTabBinding(), nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
-	projectsTabKeyBindings = []key.Binding{newProjectKeyBinding, leftpane.SessionsTabBinding(), leftpane.ProjectsTabBinding(), nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
-	detailsPanelKeyBindings = []key.Binding{nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
+	sessionsTabKeyBindings  = []key.Binding{newSessionKeyBinding, attachShellKeyBinding, attachAgentKeyBinding, inspector.NextViewKeyBinding, inspector.PrevViewKeyBinding, leftpane.SessionsTabBinding(), leftpane.ProjectsTabBinding(), nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
+	projectsTabKeyBindings  = []key.Binding{newProjectKeyBinding, leftpane.SessionsTabBinding(), leftpane.ProjectsTabBinding(), nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
+	detailsPanelKeyBindings = []key.Binding{inspector.NextViewKeyBinding, inspector.PrevViewKeyBinding, nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
 )

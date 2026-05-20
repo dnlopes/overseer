@@ -109,6 +109,16 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 	if _, err := s.tmux.CreateSession(ctx, sess.ID.String(), startDir, ""); err != nil {
 		return CreateSessionResponse{}, fmt.Errorf("create tmux session: %w", err)
 	}
+
+	agentCmd := sess.AgentCommand
+	if agentCmd == "" {
+		agentCmd = defaultAgentCommand
+	}
+	if _, err := s.tmux.CreateSession(ctx, sess.ID.String()+"-agent", startDir, agentCmd); err != nil {
+		_ = s.tmux.KillSession(ctx, sess.ID.String())
+		return CreateSessionResponse{}, fmt.Errorf("create agent tmux session: %w", err)
+	}
+
 	if err := s.repo.Save(ctx, sess); err != nil {
 		return CreateSessionResponse{}, fmt.Errorf("save session: %w", err)
 	}
@@ -334,6 +344,63 @@ func (s *SessionService) AttachAgent(ctx context.Context, req AttachAgentRequest
 	)
 
 	return AttachAgentResponse{Command: cmd}, nil
+}
+
+// --- PreviewSession ---
+
+// PreviewKind selects which tmux session attached to an Overseer session is
+// captured by PreviewSession.
+type PreviewKind int
+
+const (
+	PreviewKindShell PreviewKind = iota
+	PreviewKindAgent
+)
+
+type PreviewSessionRequest struct {
+	ID     uuid.UUID
+	Kind   PreviewKind
+	Width  int
+	Height int
+}
+
+// PreviewSessionResponse carries a snapshot of the targeted tmux pane.
+// SessionReady is false when the tmux session does not yet exist (typically
+// the agent session before its first attach); callers should render a
+// placeholder rather than treat this as an error.
+type PreviewSessionResponse struct {
+	Content      string
+	SessionReady bool
+}
+
+func (s *SessionService) PreviewSession(ctx context.Context, req PreviewSessionRequest) (PreviewSessionResponse, error) {
+	sess, err := s.repo.Get(ctx, req.ID)
+	if err != nil {
+		return PreviewSessionResponse{}, err
+	}
+
+	tmuxID := sess.ID.String()
+	if req.Kind == PreviewKindAgent {
+		tmuxID += "-agent"
+	}
+
+	if req.Width > 0 && req.Height > 0 {
+		if err := s.tmux.ResizeWindow(ctx, tmuxID, req.Width, req.Height); err != nil {
+			if errors.Is(err, domain.ErrTmuxSessionNotFound) {
+				return PreviewSessionResponse{SessionReady: false}, nil
+			}
+			return PreviewSessionResponse{}, fmt.Errorf("resize pane: %w", err)
+		}
+	}
+
+	content, err := s.tmux.CapturePane(ctx, tmuxID)
+	if errors.Is(err, domain.ErrTmuxSessionNotFound) {
+		return PreviewSessionResponse{SessionReady: false}, nil
+	}
+	if err != nil {
+		return PreviewSessionResponse{}, fmt.Errorf("capture pane: %w", err)
+	}
+	return PreviewSessionResponse{Content: content, SessionReady: true}, nil
 }
 
 func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID, startDir, shellCommand string) error {
