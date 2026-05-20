@@ -58,6 +58,34 @@ func (s Session) HasWorktree() bool {
 	return s.WorktreePath != ""
 }
 
+// WorktreeIsInsideRoot reports whether the session's WorktreePath lies
+// inside the supplied root directory. It is the safety guard that protects
+// destructive operations (worktree removal) from acting on paths outside
+// the managed worktree root — even if the persisted Session row has been
+// hand-edited or corrupted.
+//
+// The check uses filepath.Rel so siblings of the root that share a textual
+// prefix (e.g. "/data/worktrees-evil" vs "/data/worktrees") are rejected.
+// A session without a worktree is trivially "inside" — callers should gate
+// this check with HasWorktree.
+func (s Session) WorktreeIsInsideRoot(root string) bool {
+	if s.WorktreePath == "" {
+		return true
+	}
+	root = strings.TrimSpace(root)
+	if root == "" || !filepath.IsAbs(root) {
+		return false
+	}
+	rel, err := filepath.Rel(root, s.WorktreePath)
+	if err != nil {
+		return false
+	}
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+	return true
+}
+
 func (s *Session) Rename(newName string) error {
 	newName = strings.TrimSpace(newName)
 	if newName == "" {
@@ -138,5 +166,7 @@ var (
 	ErrSessionAlreadyExists           = errors.New("session already exists")
 	ErrSessionWorktreeFieldsMismatch  = errors.New("session worktree fields must all be set")
 	ErrSessionWorktreePathNotAbsolute = errors.New("session worktree path must be absolute")
+	ErrSessionWorktreePathOutsideRoot = errors.New("session worktree path is outside the managed worktree root")
 	ErrSessionEmptyAgentCommand       = errors.New("session agent command cannot be empty")
+	ErrSessionNoAgentCommandAvailable = errors.New("session has no agent command and no default launcher is configured")
 )

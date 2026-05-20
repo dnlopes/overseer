@@ -18,4 +18,8 @@ var (
 	reorderDownKeyBinding = key.NewBinding(key.WithKeys("shift+down"), key.WithHelp("shift+↓", "move row down"))
 	nextGroupKeyBinding   = key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "next group"))
 	prevGroupKeyBinding   = key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "previous group"))
+
+	deleteSessionKeyBinding = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete session"))
+	deleteConfirmKeyBinding = key.NewBinding(key.WithKeys("y", "enter"), key.WithHelp("y/enter", "confirm delete"))
+	deleteCancelKeyBinding  = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel"))
 )

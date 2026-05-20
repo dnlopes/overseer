@@ -16,6 +16,7 @@ func TestDarkTheme_NoZeroColors(t *testing.T) {
 		{"Primary", theme.Primary},
 		{"Accent", theme.Accent},
 		{"Warning", theme.Warning},
+		{"Danger", theme.Danger},
 		{"Muted", theme.Muted},
 		{"Text", theme.Text},
 		{"Subtext", theme.Subtext},
@@ -30,8 +31,8 @@ func TestDarkTheme_NoZeroColors(t *testing.T) {
 		{"ModalBg", theme.ModalBg},
 		{"OverlayBg", theme.OverlayBg},
 	}
-	if len(fields) != 16 {
-		t.Fatalf("expected 16 color fields, got %d", len(fields))
+	if len(fields) != 17 {
+		t.Fatalf("expected 17 color fields, got %d", len(fields))
 	}
 	for _, f := range fields {
 		if f.color == nil {

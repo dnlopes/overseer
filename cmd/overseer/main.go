@@ -33,14 +33,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	log, logCloser, err := logger.New(cfg.Logging.Level)
+	resolver := paths.NewResolver(cfg.Storage.DataDir)
+
+	log, logCloser, err := logger.New(resolver.LogFile(), cfg.Logging.Level)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "overseer: initialize logger: %v\n", err)
 		os.Exit(1)
 	}
 	defer logCloser.Close()
 
-	store, err := storage.New(paths.DataFile(), log)
+	launchers, err := cfg.DomainLaunchers()
+	if err != nil {
+		log.Error("resolve launchers", "error", err)
+		os.Exit(1)
+	}
+	var defaultLauncher domain.Launcher
+	if len(launchers) > 0 {
+		defaultLauncher = launchers[0]
+	}
+
+	store, err := storage.New(resolver.DataFile(), log)
 	if err != nil {
 		log.Error("initialize storage", "error", err)
 		os.Exit(1)
@@ -60,7 +72,7 @@ func main() {
 
 	githubAdapter := githubcli.New(log)
 
-	sessionSvc := service.NewSessionService(store.Sessions(), store.Projects(), tmuxAdapter, gitAdapter, log)
+	sessionSvc := service.NewSessionService(store.Sessions(), store.Projects(), tmuxAdapter, gitAdapter, resolver, defaultLauncher, log)
 	projectSvc := service.NewProjectService(store.Projects(), gitAdapter, log)
 	prSvc := service.NewPullRequestService(githubAdapter, log)
 
@@ -68,7 +80,7 @@ func main() {
 	scheduler := jobs.New(prJob)
 
 	s := styles.New()
-	dash := dashboard.New(s, *sessionSvc, *projectSvc, scheduler)
+	dash := dashboard.New(s, *sessionSvc, *projectSvc, scheduler, launchers, cfg.Dashboard.MinWidth, cfg.Dashboard.MinHeight)
 	p := tea.NewProgram(altScreenModel{inner: dash})
 
 	if _, err := p.Run(); err != nil {

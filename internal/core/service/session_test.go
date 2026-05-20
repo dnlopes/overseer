@@ -44,6 +44,17 @@ func newSessionMocks(t *testing.T) (*mocks.MockSessionRepository, *mocks.MockPro
 		mocks.NewMockGitAdapter(t)
 }
 
+func newTestSessionService(
+	repo domain.SessionRepository,
+	projects domain.ProjectRepository,
+	tmux domain.TmuxAdapter,
+	git domain.GitAdapter,
+	logger *slog.Logger,
+) *SessionService {
+	launcher, _ := domain.NewLauncher("OpenCode", "opencode")
+	return NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), launcher, logger)
+}
+
 // --- Create ---
 
 // expectProjectLookup wires the project repository mock to return a project
@@ -73,7 +84,7 @@ func TestSessionService_Create_HappyPath(t *testing.T) {
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if err != nil {
@@ -98,7 +109,7 @@ func TestSessionService_Create_HappyPath(t *testing.T) {
 	if resp.Session.BaseBranch != "main" {
 		t.Fatalf("Create() Session.BaseBranch = %q, want %q", resp.Session.BaseBranch, "main")
 	}
-	wantPath := paths.SessionWorktreePath(resp.Session.ID)
+	wantPath := paths.NewResolver("").SessionWorktreePath(resp.Session.ID)
 	if resp.Session.WorktreePath != wantPath {
 		t.Fatalf("Create() Session.WorktreePath = %q, want %q", resp.Session.WorktreePath, wantPath)
 	}
@@ -120,7 +131,7 @@ func TestSessionService_Create_WithoutProjectShellsIntoHome(t *testing.T) {
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "orphan", ProjectID: uuid.Nil})
 
 	if err != nil {
@@ -139,7 +150,7 @@ func TestSessionService_Create_WithoutProjectShellsIntoHome(t *testing.T) {
 
 func TestSessionService_Create_EmptyName(t *testing.T) {
 	repo, projects, tmux, git := newSessionMocks(t)
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "", ProjectID: uuid.New()})
 
@@ -155,7 +166,7 @@ func TestSessionService_Create_DuplicateNameWithinSameProject(t *testing.T) {
 	expectProjectLookup(t, projects, overseerID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if !errors.Is(err, domain.ErrSessionAlreadyExists) {
@@ -175,7 +186,7 @@ func TestSessionService_Create_DuplicateNameAcrossProjectsAllowed(t *testing.T) 
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if err != nil {
@@ -188,7 +199,7 @@ func TestSessionService_Create_DuplicateNameAmongUnassignedSessions(t *testing.T
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "solo", ProjectID: uuid.Nil})
 
 	if !errors.Is(err, domain.ErrSessionAlreadyExists) {
@@ -218,7 +229,7 @@ func TestSessionService_Create_OrderIncrement(t *testing.T) {
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "gamma", ProjectID: overseerID})
 
 	if err != nil {
@@ -243,7 +254,7 @@ func TestSessionService_Create_AgentTmuxErrorKillsShellAndPropagates(t *testing.
 		Return("", tmuxErr).Once()
 	tmux.EXPECT().KillSession(mock.Anything, testutil.UUIDString()).Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: uuid.Nil})
 
 	if err == nil || !errors.Is(err, tmuxErr) {
@@ -260,7 +271,7 @@ func TestSessionService_Create_TmuxError(t *testing.T) {
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("", tmuxErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: projID})
 
 	if !errors.Is(err, tmuxErr) {
@@ -276,7 +287,7 @@ func TestSessionService_Create_GitError(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(gitErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: projID})
 
 	if !errors.Is(err, gitErr) {
@@ -290,7 +301,7 @@ func TestSessionService_Create_ProjectLookupErrorBubblesUp(t *testing.T) {
 	repo, projects, tmux, git := newSessionMocks(t)
 	projects.EXPECT().Get(mock.Anything, projID).Return(domain.Project{}, lookupErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: projID})
 
 	if !errors.Is(err, lookupErr) {
@@ -311,7 +322,7 @@ func TestSessionService_Create_FirstSessionOrder(t *testing.T) {
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{Name: "alpha", ProjectID: overseerID})
 
 	if err != nil {
@@ -335,7 +346,7 @@ func TestSessionService_Rename_HappyPath(t *testing.T) {
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: "beta"})
 
 	if err != nil {
@@ -355,7 +366,7 @@ func TestSessionService_Rename_EmptyName(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, original.ID).Return(original, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{original}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: ""})
 
 	if !errors.Is(err, domain.ErrSessionEmptyName) {
@@ -369,7 +380,7 @@ func TestSessionService_Rename_NotFound(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, missingID).
 		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: missingID, NewName: "beta"})
 
 	if !errors.Is(err, domain.ErrSessionNotFound) {
@@ -386,7 +397,7 @@ func TestSessionService_Rename_DuplicateNameInSameProject(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).
 		Return([]domain.Session{original, conflicting}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: "beta"})
 
 	if !errors.Is(err, domain.ErrSessionAlreadyExists) {
@@ -408,7 +419,7 @@ func TestSessionService_Rename_UpdatedAtChanges(t *testing.T) {
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Rename(context.Background(), RenameSessionRequest{ID: original.ID, NewName: "beta"})
 
 	if err != nil {
@@ -425,7 +436,7 @@ func TestSessionService_List_Empty(t *testing.T) {
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -447,7 +458,7 @@ func TestSessionService_List_SortsByOrderWithinSameProject(t *testing.T) {
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{s1, s2, s3}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -478,7 +489,7 @@ func TestSessionService_List_GroupsByProjectID(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).
 		Return([]domain.Session{highSession, lowSession}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -506,7 +517,7 @@ func TestSessionService_List_OrderWithinGroup(t *testing.T) {
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{s1, s2, s3}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.List(context.Background(), ListSessionsRequest{})
 
 	if err != nil {
@@ -535,7 +546,7 @@ func TestSessionService_Reorder_MoveDown(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Twice()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: b.ID, Direction: 1})
 
 	if err != nil {
@@ -563,7 +574,7 @@ func TestSessionService_Reorder_MoveUp(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Twice()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: b.ID, Direction: -1})
 
 	if err != nil {
@@ -590,7 +601,7 @@ func TestSessionService_Reorder_BoundaryFirst_Up(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, a.ID).Return(a, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: a.ID, Direction: -1})
 
 	if !errors.Is(err, errs.ErrNoOp) {
@@ -611,7 +622,7 @@ func TestSessionService_Reorder_BoundaryLast_Down(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, c.ID).Return(c, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a, b, c}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: c.ID, Direction: 1})
 
 	if !errors.Is(err, errs.ErrNoOp) {
@@ -627,7 +638,7 @@ func TestSessionService_Reorder_SingleSession(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, a.ID).Return(a, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{a}, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: a.ID, Direction: 1})
 
 	if !errors.Is(err, errs.ErrNoOp) {
@@ -641,7 +652,7 @@ func TestSessionService_Reorder_NotFound(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, missingID).
 		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Reorder(context.Background(), ReorderSessionRequest{ID: missingID, Direction: 1})
 
 	if !errors.Is(err, domain.ErrSessionNotFound) {
@@ -660,7 +671,7 @@ func TestSessionService_AttachShell_HappyPath(t *testing.T) {
 	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.ID.String())
 	tmux.EXPECT().AttachCommand(mock.Anything, sess.ID.String()).Return(wantCmd, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
 
 	if err != nil {
@@ -677,7 +688,7 @@ func TestSessionService_AttachShell_SessionNotFound(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, missingID).
 		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: missingID})
 
 	if !errors.Is(err, domain.ErrSessionNotFound) {
@@ -695,7 +706,7 @@ func TestSessionService_AttachShell_TmuxAdapterErrorWrapped(t *testing.T) {
 	tmux.EXPECT().AttachCommand(mock.Anything, sess.ID.String()).
 		Return(nil, adapterErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
 
 	if err == nil || !errors.Is(err, adapterErr) {
@@ -715,7 +726,7 @@ func TestSessionService_AttachShell_TmuxSessionMissing_RecreatesThenAttaches(t *
 	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.ID.String())
 	tmux.EXPECT().AttachCommand(mock.Anything, sess.ID.String()).Return(wantCmd, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
 
 	if err != nil {
@@ -738,7 +749,7 @@ func TestSessionService_AttachShell_ProjectBackedRecreatesAtWorktreePath(t *test
 	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.ID.String())
 	tmux.EXPECT().AttachCommand(mock.Anything, sess.ID.String()).Return(wantCmd, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
 
 	if err != nil {
@@ -757,7 +768,7 @@ func TestSessionService_AttachShell_GetSessionUnexpectedErrorBubblesUp(t *testin
 	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
 		Return(domain.TmuxSession{}, inspectErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
 
 	if err == nil || !errors.Is(err, inspectErr) {
@@ -776,7 +787,7 @@ func TestSessionService_AttachShell_RecreateErrorBubblesUp(t *testing.T) {
 	tmux.EXPECT().CreateSession(mock.Anything, sess.ID.String(), "/tmp/overseer-home", "").
 		Return("", createErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
 
 	if err == nil || !errors.Is(err, createErr) {
@@ -798,7 +809,7 @@ func TestSessionService_Create_WithAgentCommand(t *testing.T) {
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.Create(context.Background(), CreateSessionRequest{
 		Name:         "alpha",
 		ProjectID:    uuid.Nil,
@@ -819,7 +830,7 @@ func TestSessionService_Create_WithAgentCommand(t *testing.T) {
 func TestSessionService_Create_RejectsInvalidAgentCommand(t *testing.T) {
 	repo, projects, tmux, git := newSessionMocks(t)
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), CreateSessionRequest{
 		Name:         "alpha",
 		ProjectID:    uuid.Nil,
@@ -846,7 +857,7 @@ func TestSessionService_AttachAgent_HappyPath(t *testing.T) {
 	wantCmd := exec.Command("tmux", "attach-session", "-t", agentTmuxID)
 	tmux.EXPECT().AttachCommand(mock.Anything, agentTmuxID).Return(wantCmd, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if err != nil {
@@ -873,7 +884,7 @@ func TestSessionService_AttachAgent_AgentTmuxMissing_RecreatesWithCommand(t *tes
 	wantCmd := exec.Command("tmux", "attach-session", "-t", agentTmuxID)
 	tmux.EXPECT().AttachCommand(mock.Anything, agentTmuxID).Return(wantCmd, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if err != nil {
@@ -900,7 +911,7 @@ func TestSessionService_AttachAgent_ProjectLessRecreatesAtHome(t *testing.T) {
 	wantCmd := exec.Command("tmux", "attach-session", "-t", agentTmuxID)
 	tmux.EXPECT().AttachCommand(mock.Anything, agentTmuxID).Return(wantCmd, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if err != nil {
@@ -927,7 +938,7 @@ func TestSessionService_AttachAgent_EmptyAgentCommand_FallsBackToOpencode(t *tes
 	wantCmd := exec.Command("tmux", "attach-session", "-t", agentTmuxID)
 	tmux.EXPECT().AttachCommand(mock.Anything, agentTmuxID).Return(wantCmd, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if err != nil {
@@ -938,13 +949,30 @@ func TestSessionService_AttachAgent_EmptyAgentCommand_FallsBackToOpencode(t *tes
 	}
 }
 
+func TestSessionService_AttachAgent_NoSessionCommandAndNoDefaultLauncher_ReturnsSentinel(t *testing.T) {
+	t.Setenv("HOME", "/tmp/overseer-home")
+	sess := testutil.MakeSession("alpha", uuid.Nil)
+	if sess.AgentCommand != "" {
+		t.Fatalf("test precondition: AgentCommand must start empty, got %q", sess.AgentCommand)
+	}
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), domain.Launcher{}, testLogger())
+	_, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
+
+	if !errors.Is(err, domain.ErrSessionNoAgentCommandAvailable) {
+		t.Fatalf("AttachAgent() error = %v, want ErrSessionNoAgentCommandAvailable", err)
+	}
+}
+
 func TestSessionService_AttachAgent_SessionNotFound(t *testing.T) {
 	missingID := uuid.New()
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, missingID).
 		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: missingID})
 
 	if !errors.Is(err, domain.ErrSessionNotFound) {
@@ -964,7 +992,7 @@ func TestSessionService_AttachAgent_GetTmuxSessionUnexpectedErrorBubblesUp(t *te
 	tmux.EXPECT().GetSession(mock.Anything, agentTmuxID).
 		Return(domain.TmuxSession{}, inspectErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if err == nil || !errors.Is(err, inspectErr) {
@@ -987,7 +1015,7 @@ func TestSessionService_AttachAgent_RecreateErrorBubblesUp(t *testing.T) {
 	tmux.EXPECT().CreateSession(mock.Anything, agentTmuxID, "/tmp/overseer-home", "opencode").
 		Return("", createErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if err == nil || !errors.Is(err, createErr) {
@@ -1009,7 +1037,7 @@ func TestSessionService_AttachAgent_TmuxAdapterErrorWrapped(t *testing.T) {
 	tmux.EXPECT().AttachCommand(mock.Anything, agentTmuxID).
 		Return(nil, adapterErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if err == nil || !errors.Is(err, adapterErr) {
@@ -1023,7 +1051,7 @@ func TestSessionService_PreviewSession_Shell_ReturnsContent(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
 	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()).Return("shell content", nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
 
 	if err != nil {
@@ -1044,7 +1072,7 @@ func TestSessionService_PreviewSession_Agent_TargetsAgentTmuxID(t *testing.T) {
 	wantTmuxID := sess.ID.String() + "-agent"
 	tmux.EXPECT().CapturePane(mock.Anything, wantTmuxID).Return("agent content", nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindAgent})
 
 	if err != nil {
@@ -1065,7 +1093,7 @@ func TestSessionService_PreviewSession_TmuxSessionMissing_ReturnsNotReady(t *tes
 	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()+"-agent").
 		Return("", domain.ErrTmuxSessionNotFound).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindAgent})
 
 	if err != nil {
@@ -1085,7 +1113,7 @@ func TestSessionService_PreviewSession_SessionNotFound(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, missingID).
 		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: missingID, Kind: PreviewKindShell})
 
 	if !errors.Is(err, domain.ErrSessionNotFound) {
@@ -1100,7 +1128,7 @@ func TestSessionService_PreviewSession_TmuxAdapterErrorWrapped(t *testing.T) {
 	adapterErr := errors.New("tmux server crashed")
 	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()).Return("", adapterErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
 
 	if err == nil || !errors.Is(err, adapterErr) {
@@ -1115,7 +1143,7 @@ func TestSessionService_PreviewSession_WithDimensions_ResizesBeforeCapture(t *te
 	tmux.EXPECT().ResizeWindow(mock.Anything, sess.ID.String(), 120, 40).Return(nil).Once()
 	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()).Return("resized content", nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{
 		ID: sess.ID, Kind: PreviewKindShell, Width: 120, Height: 40,
 	})
@@ -1135,7 +1163,7 @@ func TestSessionService_PreviewSession_ResizeNotFound_ReturnsNotReady(t *testing
 	tmux.EXPECT().ResizeWindow(mock.Anything, sess.ID.String()+"-agent", 80, 24).
 		Return(domain.ErrTmuxSessionNotFound).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{
 		ID: sess.ID, Kind: PreviewKindAgent, Width: 80, Height: 24,
 	})
@@ -1155,12 +1183,270 @@ func TestSessionService_PreviewSession_ResizeErrorWrapped(t *testing.T) {
 	resizeErr := errors.New("resize forbidden")
 	tmux.EXPECT().ResizeWindow(mock.Anything, sess.ID.String(), 80, 24).Return(resizeErr).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{
 		ID: sess.ID, Kind: PreviewKindShell, Width: 80, Height: 24,
 	})
 
 	if err == nil || !errors.Is(err, resizeErr) {
 		t.Fatalf("PreviewSession() error = %v, want wrapped %v", err, resizeErr)
+	}
+}
+
+// --- Delete ---
+
+// pinWorktreeRoot isolates worktree paths to a temp directory for the test
+// by overriding XDG_DATA_HOME, then returns the resolved worktree root.
+func pinWorktreeRoot(t *testing.T) string {
+	t.Helper()
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	return paths.NewResolver("").WorktreeRoot()
+}
+
+func TestSessionService_Delete_HappyPath_ProjectBackedSession(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.NewResolver("").SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	project := testutil.MakeProject("/repo/overseer", "overseer")
+	project.ID = overseerID
+	projects.EXPECT().Get(mock.Anything, overseerID).Return(project, nil).Once()
+	git.EXPECT().RemoveWorktree(mock.Anything, "/repo/overseer", sess.WorktreePath).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil", err)
+	}
+}
+
+func TestSessionService_Delete_HappyPath_ProjectlessSessionSkipsFilesystem(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil", err)
+	}
+}
+
+func TestSessionService_Delete_NotFound(t *testing.T) {
+	missingID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, missingID).
+		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: missingID})
+
+	if !errors.Is(err, domain.ErrSessionNotFound) {
+		t.Fatalf("Delete() error = %v, want %v", err, domain.ErrSessionNotFound)
+	}
+}
+
+func TestSessionService_Delete_WorktreePathOutsideRoot_Refused(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSessionWithWorktree(
+		"malicious",
+		uuid.New(),
+		"/etc/passwd",
+		"main",
+		"overseer/malicious",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, domain.ErrSessionWorktreePathOutsideRoot) {
+		t.Fatalf("Delete() error = %v, want %v", err, domain.ErrSessionWorktreePathOutsideRoot)
+	}
+}
+
+func TestSessionService_Delete_WorktreePathSiblingOfRoot_Refused(t *testing.T) {
+	root := pinWorktreeRoot(t)
+	sess := testutil.MakeSessionWithWorktree(
+		"sneaky",
+		uuid.New(),
+		root+"-evil/abc",
+		"main",
+		"overseer/sneaky",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, domain.ErrSessionWorktreePathOutsideRoot) {
+		t.Fatalf("Delete() error = %v, want %v (root=%q)", err, domain.ErrSessionWorktreePathOutsideRoot, root)
+	}
+}
+
+func TestSessionService_Delete_ProjectMissing_StillDeletesSessionAndTmux(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.NewResolver("").SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	projects.EXPECT().Get(mock.Anything, overseerID).
+		Return(domain.Project{}, domain.ErrProjectNotFound).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil when project missing", err)
+	}
+}
+
+func TestSessionService_Delete_ProjectLookupErrorBubblesUp(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.NewResolver("").SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	lookupErr := errors.New("project store unavailable")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	projects.EXPECT().Get(mock.Anything, overseerID).Return(domain.Project{}, lookupErr).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, lookupErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, lookupErr)
+	}
+}
+
+func TestSessionService_Delete_GitRemoveWorktreeErrorAbortsBeforeTmuxAndDB(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.NewResolver("").SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	project := testutil.MakeProject("/repo/overseer", "overseer")
+	project.ID = overseerID
+	gitErr := errors.New("git worktree busy")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	projects.EXPECT().Get(mock.Anything, overseerID).Return(project, nil).Once()
+	git.EXPECT().RemoveWorktree(mock.Anything, project.Path, sess.WorktreePath).Return(gitErr).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, gitErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, gitErr)
+	}
+}
+
+func TestSessionService_Delete_TmuxSessionAlreadyGone_StillDeletes(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{}, domain.ErrTmuxSessionNotFound).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil when tmux session is already gone", err)
+	}
+}
+
+func TestSessionService_Delete_TmuxInspectErrorBubblesUp(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	inspectErr := errors.New("tmux server unreachable")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{}, inspectErr).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, inspectErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, inspectErr)
+	}
+}
+
+func TestSessionService_Delete_TmuxKillErrorAbortsBeforeDB(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	killErr := errors.New("tmux refused kill")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(killErr).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, killErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, killErr)
+	}
+}
+
+func TestSessionService_Delete_RepoDeleteErrorBubblesUp(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	deleteErr := errors.New("storage write failed")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(deleteErr).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, deleteErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, deleteErr)
 	}
 }

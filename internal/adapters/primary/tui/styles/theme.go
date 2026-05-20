@@ -8,6 +8,7 @@ type Theme struct {
 	Primary      color.Color
 	Accent       color.Color
 	Warning      color.Color
+	Danger       color.Color
 	Muted        color.Color
 	Text         color.Color
 	Subtext      color.Color

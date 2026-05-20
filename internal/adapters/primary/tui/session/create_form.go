@@ -23,17 +23,11 @@ const (
 	FieldLauncherSelectedIndex
 )
 
-const (
-	launcherOpencode = iota
-	launcherClaude
-)
-
-var launcherCommands = []string{"opencode", "claude"}
-
 type CreateFormModel struct {
 	nameInput       textinput.Model
 	projectIdx      int
 	projects        []domain.Project
+	launchers       []domain.Launcher
 	launcherIdx     int
 	focusIndex      shared.CircularInt
 	errMsg          string
@@ -41,7 +35,8 @@ type CreateFormModel struct {
 	styles          *styles.Styles
 }
 
-func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, projects []domain.Project) CreateFormModel {
+// NewCreateForm builds the session-create form with the configured launcher choices.
+func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, projects []domain.Project, launchers []domain.Launcher) CreateFormModel {
 	nameInput := textinput.New()
 	nameInput.Placeholder = "Session name"
 	nameInput.CharLimit = 100
@@ -53,7 +48,8 @@ func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, pro
 		nameInput:       nameInput,
 		projectIdx:      0,
 		projects:        projects,
-		launcherIdx:     launcherOpencode,
+		launchers:       launchers,
+		launcherIdx:     0,
 		focusIndex:      shared.NewCircularInt(0, 2),
 		sessionsService: sessionsService,
 		styles:          s,
@@ -132,12 +128,18 @@ func (m *CreateFormModel) cycleProject(direction int) {
 }
 
 func (m *CreateFormModel) cycleLauncher(direction int) {
-	choices := len(launcherCommands)
+	choices := len(m.launchers)
+	if choices == 0 {
+		return
+	}
 	m.launcherIdx = ((m.launcherIdx+direction)%choices + choices) % choices
 }
 
 func (m CreateFormModel) resolvedAgentCommand() string {
-	return launcherCommands[m.launcherIdx]
+	if len(m.launchers) == 0 {
+		return ""
+	}
+	return m.launchers[m.launcherIdx].Command
 }
 
 func (m CreateFormModel) selectedProjectID() uuid.UUID {
@@ -225,13 +227,13 @@ func (m CreateFormModel) projectSelectorView() string {
 }
 
 func (m CreateFormModel) launcherSelectorView() string {
-	parts := make([]string, 0, len(launcherCommands))
-	for i, opt := range launcherCommands {
+	parts := make([]string, 0, len(m.launchers))
+	for i, l := range m.launchers {
 		if i == m.launcherIdx {
-			parts = append(parts, m.styles.ListRow.Selected.Render("[ "+opt+" ]"))
+			parts = append(parts, m.styles.ListRow.Selected.Render("[ "+l.DisplayName+" ]"))
 			continue
 		}
-		parts = append(parts, m.styles.ListRow.Normal.Render("  "+opt+"  "))
+		parts = append(parts, m.styles.ListRow.Normal.Render("  "+l.DisplayName+"  "))
 	}
 	return strings.Join(parts, " ")
 }

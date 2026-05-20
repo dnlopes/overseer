@@ -8,65 +8,48 @@ import (
 	"github.com/google/uuid"
 )
 
-func DataDir() string {
-	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-		return filepath.Join(xdg, "overseer")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".local", "share", "overseer")
+type Resolver struct {
+	dataDir  string
+	stateDir string
 }
 
-func ConfigDir() string {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "overseer")
+func NewResolver(dataDirOverride string) Resolver {
+	return Resolver{
+		dataDir:  pickDir(dataDirOverride, defaultDataDir),
+		stateDir: defaultStateDir(),
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".config", "overseer")
 }
 
-func StateDir() string {
-	if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
-		return filepath.Join(xdg, "overseer")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".local", "state", "overseer")
+func (r Resolver) DataFile() string {
+	return filepath.Join(r.dataDir, "data.json")
 }
 
-func DataFile() string {
-	return filepath.Join(DataDir(), "data.json")
+func (r Resolver) LogFile() string {
+	return filepath.Join(r.stateDir, "overseer.log")
 }
 
+func (r Resolver) WorktreeRoot() string {
+	return filepath.Join(r.dataDir, "worktrees")
+}
+
+func (r Resolver) SessionWorktreePath(sessionID uuid.UUID) string {
+	return filepath.Join(r.WorktreeRoot(), sessionID.String())
+}
+
+// ConfigFile is a package-level bootstrap helper used to locate the config
+// file BEFORE a Resolver can be constructed (chicken-and-egg: the config
+// itself defines what the Resolver should override).
+//
+// Resolution precedence: OVERSEER_CONFIG_FILE env var (verbatim, full path)
+// → XDG_CONFIG_HOME/overseer/config.yaml → $HOME/.config/overseer/config.yaml.
 func ConfigFile() string {
-	return filepath.Join(ConfigDir(), "config.yaml")
+	if override := os.Getenv("OVERSEER_CONFIG_FILE"); override != "" {
+		return override
+	}
+	return filepath.Join(defaultConfigDir(), "config.yaml")
 }
 
-func LogFile() string {
-	return filepath.Join(StateDir(), "overseer.log")
-}
-
-// WorktreeRoot is the directory under DataDir that holds per-session git
-// worktrees. Each session's worktree lives at WorktreeRoot()/<session-id>.
-func WorktreeRoot() string {
-	return filepath.Join(DataDir(), "worktrees")
-}
-
-// SessionWorktreePath returns the absolute worktree path for a session,
-// keyed by its UUID. Using the UUID (not the name) keeps the path stable
-// across renames.
-func SessionWorktreePath(sessionID uuid.UUID) string {
-	return filepath.Join(WorktreeRoot(), sessionID.String())
-}
-
-// SessionFeatureBranch returns the convention-based git branch name for a
+// SessionFeatureBranch is the convention-based git branch name for a
 // session's worktree: "overseer/<session-id>". The session UUID guarantees
 // the branch name is unique within the repository.
 func SessionFeatureBranch(sessionID uuid.UUID) string {
@@ -83,4 +66,44 @@ func AtomicWrite(path string, data []byte) error {
 		return fmt.Errorf("atomic write: %w", err)
 	}
 	return os.Rename(tmp, path)
+}
+
+func pickDir(override string, fallback func() string) string {
+	if override != "" {
+		return override
+	}
+	return fallback()
+}
+
+func defaultDataDir() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "overseer")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".local", "share", "overseer")
+}
+
+func defaultConfigDir() string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "overseer")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "overseer")
+}
+
+func defaultStateDir() string {
+	if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
+		return filepath.Join(xdg, "overseer")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".local", "state", "overseer")
 }

@@ -14,12 +14,13 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	"github.com/dnlopes/overseer/internal/core/domain"
 	"github.com/dnlopes/overseer/internal/core/service"
+	"github.com/dnlopes/overseer/internal/shared/paths"
 	"github.com/dnlopes/overseer/internal/testutil"
 	"github.com/dnlopes/overseer/internal/testutil/mocks"
 )
 
 func TestCreateForm_DefaultsToNoProject(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil)
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
 
 	if form.selectedProjectID() != uuid.Nil {
 		t.Fatalf("default selected project = %v, want uuid.Nil", form.selectedProjectID())
@@ -32,7 +33,7 @@ func TestCreateForm_DefaultsToNoProject(t *testing.T) {
 func TestCreateForm_TabFocusesProjectSelectorAndArrowsCycle(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
 	widgets := testutil.MakeProject("/repo/widgets", "Widgets")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets})
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets}, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("right"))
@@ -49,7 +50,7 @@ func TestCreateForm_TabFocusesProjectSelectorAndArrowsCycle(t *testing.T) {
 func TestCreateForm_LeftFromNoneWrapsToLastProject(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
 	widgets := testutil.MakeProject("/repo/widgets", "Widgets")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets})
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets}, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("left"))
@@ -69,7 +70,7 @@ func TestCreateForm_SubmitCreatesSessionWithSelectedProject(t *testing.T) {
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, []domain.Project{overseer})
+	form := NewCreateForm(styles.New(), svc, []domain.Project{overseer}, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("alpha"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -98,7 +99,7 @@ func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").Return("tmux-orphan-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, nil)
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("orphan"))
 	_, cmd := updated.(CreateFormModel).Update(formKeyPress("enter"))
@@ -117,7 +118,7 @@ func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
 
 func TestCreateForm_ViewShowsCurrentProjectLabel(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer})
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer}, testLaunchers(t))
 
 	view := form.View().Content
 	if !strings.Contains(view, "(none)") {
@@ -126,7 +127,7 @@ func TestCreateForm_ViewShowsCurrentProjectLabel(t *testing.T) {
 }
 
 func TestCreateForm_DefaultsToOpencodeLauncher(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil)
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
 
 	if form.resolvedAgentCommand() != "opencode" {
 		t.Fatalf("default resolved agent command = %q, want %q", form.resolvedAgentCommand(), "opencode")
@@ -134,7 +135,7 @@ func TestCreateForm_DefaultsToOpencodeLauncher(t *testing.T) {
 }
 
 func TestCreateForm_LauncherSelectorTogglesBetweenOpencodeAndClaude(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil)
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -160,7 +161,7 @@ func TestCreateForm_LauncherSelectorTogglesBetweenOpencodeAndClaude(t *testing.T
 }
 
 func TestCreateForm_TabCyclesThreeFields(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil)
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -181,7 +182,7 @@ func TestCreateForm_SubmitWithDefaultOpencodeSendsOpencodeCommand(t *testing.T) 
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, nil)
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("orphan"))
 	_, cmd := updated.(CreateFormModel).Update(formKeyPress("enter"))
@@ -205,7 +206,7 @@ func TestCreateForm_SubmitWithClaudeSendsClaudeCommand(t *testing.T) {
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, nil)
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t))
 
 	updated, _ := form.Update(formKeyPress("orphan"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -223,12 +224,12 @@ func TestCreateForm_SubmitWithClaudeSendsClaudeCommand(t *testing.T) {
 }
 
 func TestCreateForm_ViewShowsLauncherOptions(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil)
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
 
 	view := form.View().Content
-	for _, want := range []string{"opencode", "claude"} {
+	for _, want := range []string{"OpenCode", "Claude Code"} {
 		if !strings.Contains(view, want) {
-			t.Fatalf("View() missing launcher option %q: %q", want, view)
+			t.Fatalf("View() missing launcher display name %q: %q", want, view)
 		}
 	}
 }
@@ -245,7 +246,21 @@ func newCreateFormSessionServiceWithMocks(t *testing.T) (service.SessionService,
 	projects := mocks.NewMockProjectRepository(t)
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
-	return *service.NewSessionService(repo, projects, tmux, git, slog.Default()), repo, projects, tmux, git
+	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode")
+	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, slog.Default()), repo, projects, tmux, git
+}
+
+func testLaunchers(t *testing.T) []domain.Launcher {
+	t.Helper()
+	opencode, err := domain.NewLauncher("OpenCode", "opencode")
+	if err != nil {
+		t.Fatalf("NewLauncher OpenCode: %v", err)
+	}
+	claude, err := domain.NewLauncher("Claude Code", "claude")
+	if err != nil {
+		t.Fatalf("NewLauncher Claude Code: %v", err)
+	}
+	return []domain.Launcher{opencode, claude}
 }
 
 func formKeyPress(value string) tea.KeyPressMsg {

@@ -70,7 +70,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch typed := msg.(type) {
-	case shared.SessionsLoadedMsg, shared.SessionCreatedMsg, shared.SessionReorderedMsg:
+	case shared.SessionsLoadedMsg, shared.SessionCreatedMsg, shared.SessionReorderedMsg, shared.SessionDeletedMsg:
 		var cmd tea.Cmd
 		m.sessions, cmd = shared.UpdateModel(m.sessions, typed)
 		return m, cmd
