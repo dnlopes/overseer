@@ -12,7 +12,6 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/inspector"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/jobs"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/leftpane"
-	projectui "github.com/dnlopes/overseer/internal/adapters/primary/tui/project"
 	sessionui "github.com/dnlopes/overseer/internal/adapters/primary/tui/session"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
@@ -31,7 +30,6 @@ type popupKind int
 const (
 	popupNone popupKind = iota
 	popupNewSession
-	popupNewProject
 	popupDeleteSession
 )
 
@@ -42,7 +40,6 @@ type Model struct {
 	helpBar        shared.HelpBarModel
 	createForm     sessionui.CreateFormModel
 	deleteForm     sessionui.DeleteFormModel
-	registerForm   projectui.RegisterFormModel
 	scheduler      jobs.Model
 	activePopup    popupKind
 	cachedProjects []domain.Project
@@ -71,15 +68,14 @@ func New(
 	minWidth, minHeight int,
 ) Model {
 	sessionsModel := sessionui.New(styles, sessionsService)
-	projectsModel := projectui.New(styles, projectsService)
-	left := leftpane.New(styles, sessionsModel, projectsModel)
+	left := leftpane.New(styles, sessionsModel)
 	left.SetFocus(true)
 	m := Model{
 		styles:          styles,
 		titlebar:        newTitlebar(styles, "Overseer"),
 		leftPane:        left,
 		inspector:       inspector.New(styles, sessionsService),
-		helpBar:         shared.NewHelpBarModel(styles, sessionsTabKeyBindings),
+		helpBar:         shared.NewHelpBarModel(styles, sessionsKeyBindings),
 		scheduler:       scheduler,
 		sessionsService: sessionsService,
 		projectsService: projectsService,
@@ -100,7 +96,16 @@ func (m Model) Init() tea.Cmd {
 		m.inspector.Init(),
 		m.helpBar.Init(),
 		m.scheduler.Init(),
+		m.loadProjects(),
 	)
+}
+
+func (m Model) loadProjects() tea.Cmd {
+	svc := m.projectsService
+	return func() tea.Msg {
+		resp, err := svc.List(context.Background(), service.ListProjectsRequest{})
+		return shared.ProjectsLoadedMsg{Projects: resp.Projects, Err: err}
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -112,14 +117,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cachedProjects = msg.Projects
 			m.refreshProjectNameLookup()
 		}
-		var cmd tea.Cmd
-		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
-		return m, cmd
+		return m, nil
 	case shared.ProjectRegisteredMsg:
-		m.activePopup = popupNone
-		var cmd tea.Cmd
-		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
-		return m, cmd
+		m.cachedProjects = append(m.cachedProjects, msg.Project)
+		m.refreshProjectNameLookup()
+		if m.activePopup != popupNone {
+			return m.routeToPopup(msg)
+		}
+		return m, nil
 	case shared.SessionCreatedMsg:
 		m.activePopup = popupNone
 		var cmd tea.Cmd
@@ -134,11 +139,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
 		return m, cmd
-	case shared.NewSessionPopupCloseMsg, shared.NewProjectPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg:
+	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg:
 		m.activePopup = popupNone
-		return m, nil
-	case shared.LeftPaneTabChangedMsg:
-		m.helpBar.SetBindings(m.bindingsForActiveTab())
 		return m, nil
 	case shared.SessionAttachReadyMsg:
 		if msg.Err != nil || msg.Command == nil {
@@ -197,33 +199,28 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.toggleLeftRightFocus()
 		return nil, true
 	}
-	if m.leftPane.SessionsActive() && (key.Matches(msg, inspector.NextViewKeyBinding) || key.Matches(msg, inspector.PrevViewKeyBinding)) {
+	if key.Matches(msg, inspector.NextViewKeyBinding) || key.Matches(msg, inspector.PrevViewKeyBinding) {
 		var cmd tea.Cmd
 		m.inspector, cmd = shared.UpdateModel(m.inspector, msg)
 		return cmd, true
 	}
 	if m.leftPaneFocused {
-		if m.leftPane.SessionsActive() && key.Matches(msg, newSessionKeyBinding) {
-			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.cachedProjects, m.launchers, m.editors)
+		if key.Matches(msg, newSessionKeyBinding) {
+			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors)
 			m.activePopup = popupNewSession
 			return m.createForm.Init(), true
 		}
-		if m.leftPane.ProjectsActive() && key.Matches(msg, newProjectKeyBinding) {
-			m.registerForm = projectui.NewRegisterForm(m.styles, m.projectsService)
-			m.activePopup = popupNewProject
-			return m.registerForm.Init(), true
-		}
-		if m.leftPane.SessionsActive() && key.Matches(msg, attachShellKeyBinding) {
+		if key.Matches(msg, attachShellKeyBinding) {
 			if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
 				return cmd, true
 			}
 		}
-		if m.leftPane.SessionsActive() && key.Matches(msg, attachAgentKeyBinding) {
+		if key.Matches(msg, attachAgentKeyBinding) {
 			if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
 				return cmd, true
 			}
 		}
-		if m.leftPane.SessionsActive() && key.Matches(msg, openEditorKeyBinding) {
+		if key.Matches(msg, openEditorKeyBinding) {
 			if cmd := m.openSelectedSessionEditorCmd(); cmd != nil {
 				return cmd, true
 			}
@@ -291,14 +288,7 @@ func (m *Model) toggleLeftRightFocus() {
 	m.leftPaneFocused = true
 	m.leftPane.SetFocus(true)
 	m.inspector.SetFocus(false)
-	m.helpBar.SetBindings(m.bindingsForActiveTab())
-}
-
-func (m Model) bindingsForActiveTab() []key.Binding {
-	if m.leftPane.ProjectsActive() {
-		return projectsTabKeyBindings
-	}
-	return sessionsTabKeyBindings
+	m.helpBar.SetBindings(sessionsKeyBindings)
 }
 
 func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -306,10 +296,6 @@ func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case popupNewSession:
 		var cmd tea.Cmd
 		m.createForm, cmd = shared.UpdateModel(m.createForm, msg)
-		return m, cmd
-	case popupNewProject:
-		var cmd tea.Cmd
-		m.registerForm, cmd = shared.UpdateModel(m.registerForm, msg)
 		return m, cmd
 	case popupDeleteSession:
 		var cmd tea.Cmd
@@ -357,8 +343,6 @@ func (m Model) popupView() string {
 	switch m.activePopup {
 	case popupNewSession:
 		return m.createForm.View().Content
-	case popupNewProject:
-		return m.registerForm.View().Content
 	case popupDeleteSession:
 		return m.deleteForm.View().Content
 	}

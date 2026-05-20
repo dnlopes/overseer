@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -16,10 +15,6 @@ import (
 	"github.com/dnlopes/overseer/internal/shared/errs"
 	"github.com/dnlopes/overseer/internal/shared/paths"
 )
-
-// defaultBaseBranch is the fork point used when CreateSessionRequest does
-// not specify one. Surfacing this as a request field is follow-up work.
-const defaultBaseBranch = "main"
 
 type SessionService struct {
 	repo            domain.SessionRepository
@@ -62,6 +57,7 @@ func NewSessionService(
 type CreateSessionRequest struct {
 	Name          string
 	ProjectID     uuid.UUID
+	BaseBranch    string
 	AgentCommand  string
 	EditorCommand string
 }
@@ -71,6 +67,10 @@ type CreateSessionResponse struct {
 }
 
 func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (CreateSessionResponse, error) {
+	if req.BaseBranch == "" {
+		return CreateSessionResponse{}, domain.ErrSessionEmptyBaseBranch
+	}
+
 	sess, err := domain.NewSession(req.Name, req.ProjectID)
 	if err != nil {
 		return CreateSessionResponse{}, err
@@ -88,20 +88,16 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 		}
 	}
 
-	var repoPath string
-	if req.ProjectID != uuid.Nil {
-		project, err := s.projects.Get(ctx, req.ProjectID)
-		if err != nil {
-			return CreateSessionResponse{}, fmt.Errorf("lookup project: %w", err)
-		}
-		repoPath = project.Path
-		if err := sess.AssignWorktree(
-			s.pathsResolver.SessionWorktreePath(sess.ID),
-			defaultBaseBranch,
-			paths.SessionFeatureBranch(sess.ID),
-		); err != nil {
-			return CreateSessionResponse{}, fmt.Errorf("assign worktree: %w", err)
-		}
+	project, err := s.projects.Get(ctx, req.ProjectID)
+	if err != nil {
+		return CreateSessionResponse{}, fmt.Errorf("lookup project: %w", err)
+	}
+	if err := sess.AssignWorktree(
+		s.pathsResolver.SessionWorktreePath(sess.ID),
+		req.BaseBranch,
+		paths.SessionFeatureBranch(sess.ID),
+	); err != nil {
+		return CreateSessionResponse{}, fmt.Errorf("assign worktree: %w", err)
 	}
 
 	existing, err := s.repo.List(ctx)
@@ -123,17 +119,10 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 	}
 	sess.Order = nextOrder
 
-	startDir, err := sessionStartDir(sess)
-	if err != nil {
-		return CreateSessionResponse{}, err
+	if err := s.git.CreateWorktree(ctx, project.Path, sess.BaseBranch, sess.FeatureBranch, sess.WorktreePath); err != nil {
+		return CreateSessionResponse{}, fmt.Errorf("create git worktree: %w", err)
 	}
-
-	if sess.HasWorktree() {
-		if err := s.git.CreateWorktree(ctx, repoPath, sess.BaseBranch, sess.FeatureBranch, sess.WorktreePath); err != nil {
-			return CreateSessionResponse{}, fmt.Errorf("create git worktree: %w", err)
-		}
-	}
-	if _, err := s.tmux.CreateSession(ctx, sess.ID.String(), startDir, ""); err != nil {
+	if _, err := s.tmux.CreateSession(ctx, sess.ID.String(), sess.WorktreePath, ""); err != nil {
 		return CreateSessionResponse{}, fmt.Errorf("create tmux session: %w", err)
 	}
 
@@ -141,13 +130,21 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 	if agentCmd == "" {
 		agentCmd = s.defaultLauncher.Command
 	}
-	if _, err := s.tmux.CreateSession(ctx, sess.ID.String()+"-agent", startDir, agentCmd); err != nil {
+	if _, err := s.tmux.CreateSession(ctx, sess.ID.String()+"-agent", sess.WorktreePath, agentCmd); err != nil {
 		_ = s.tmux.KillSession(ctx, sess.ID.String())
 		return CreateSessionResponse{}, fmt.Errorf("create agent tmux session: %w", err)
 	}
 
 	if err := s.repo.Save(ctx, sess); err != nil {
 		return CreateSessionResponse{}, fmt.Errorf("save session: %w", err)
+	}
+
+	project.UpdatedAt = sess.CreatedAt
+	if err := s.projects.Save(ctx, project); err != nil {
+		s.logger.WarnContext(ctx, "bump project UpdatedAt failed; recency ordering may lag",
+			slog.String("project_id", project.ID.String()),
+			slog.String("error", err.Error()),
+		)
 	}
 
 	return CreateSessionResponse{Session: sess}, nil
@@ -311,11 +308,7 @@ func (s *SessionService) AttachShell(ctx context.Context, req AttachShellRequest
 	}
 
 	tmuxID := sess.ID.String()
-	startDir, err := sessionStartDir(sess)
-	if err != nil {
-		return AttachShellResponse{}, err
-	}
-	if err := s.ensureTmuxSession(ctx, tmuxID, startDir, ""); err != nil {
+	if err := s.ensureTmuxSession(ctx, tmuxID, sess, ""); err != nil {
 		return AttachShellResponse{}, err
 	}
 
@@ -348,10 +341,6 @@ func (s *SessionService) AttachAgent(ctx context.Context, req AttachAgentRequest
 	}
 
 	agentTmuxID := sess.ID.String() + "-agent"
-	startDir, err := sessionStartDir(sess)
-	if err != nil {
-		return AttachAgentResponse{}, err
-	}
 	agentCmd := sess.AgentCommand
 	if agentCmd == "" {
 		agentCmd = s.defaultLauncher.Command
@@ -359,7 +348,7 @@ func (s *SessionService) AttachAgent(ctx context.Context, req AttachAgentRequest
 	if agentCmd == "" {
 		return AttachAgentResponse{}, domain.ErrSessionNoAgentCommandAvailable
 	}
-	if err := s.ensureTmuxSession(ctx, agentTmuxID, startDir, agentCmd); err != nil {
+	if err := s.ensureTmuxSession(ctx, agentTmuxID, sess, agentCmd); err != nil {
 		return AttachAgentResponse{}, err
 	}
 
@@ -386,9 +375,8 @@ type OpenEditorResponse struct {
 	Command *exec.Cmd
 }
 
-// OpenEditor launches the configured editor at the session's worktree (or
-// $HOME for project-less sessions) as a detached background process: the
-// TUI keeps running, no alt-screen flash.
+// OpenEditor launches the configured editor at the session's worktree as a
+// detached background process: the TUI keeps running, no alt-screen flash.
 //
 // The returned *exec.Cmd has already been Start()ed — do NOT call Start/Run
 // on it again; it is exposed only for observability. A goroutine Wait()s on
@@ -582,7 +570,7 @@ func (s *SessionService) killTmuxIfExists(ctx context.Context, tmuxID string) er
 	return nil
 }
 
-func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID, startDir, shellCommand string) error {
+func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID string, sess domain.Session, shellCommand string) error {
 	_, err := s.tmux.GetSession(ctx, tmuxID)
 	if err == nil {
 		return nil
@@ -591,6 +579,10 @@ func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID, startDir
 		return fmt.Errorf("inspect tmux session: %w", err)
 	}
 
+	startDir, err := sessionStartDir(sess)
+	if err != nil {
+		return err
+	}
 	if _, err := s.tmux.CreateSession(ctx, tmuxID, startDir, shellCommand); err != nil {
 		return fmt.Errorf("recreate tmux session: %w", err)
 	}
@@ -600,16 +592,12 @@ func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID, startDir
 	return nil
 }
 
-// sessionStartDir resolves the working directory a session's tmux session
-// should open in. Project-backed sessions use their worktree; project-less
-// sessions fall back to the user's home directory.
+// sessionStartDir returns the working directory a session's tmux session
+// opens in — always the session's worktree, since every session is now
+// project-backed.
 func sessionStartDir(sess domain.Session) (string, error) {
-	if sess.HasWorktree() {
-		return sess.WorktreePath, nil
+	if !sess.HasWorktree() {
+		return "", domain.ErrSessionWorktreeFieldsMismatch
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve user home: %w", err)
-	}
-	return home, nil
+	return sess.WorktreePath, nil
 }

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"sort"
 
+	"github.com/google/uuid"
+
 	"github.com/dnlopes/overseer/internal/core/domain"
 )
 
@@ -81,4 +83,26 @@ func (s *ProjectService) List(ctx context.Context, _ ListProjectsRequest) (ListP
 	})
 
 	return ListProjectsResponse{Projects: projects}, nil
+}
+
+// --- DetectDefaultBranch ---
+
+type DetectDefaultBranchRequest struct {
+	ProjectID uuid.UUID
+}
+
+type DetectDefaultBranchResponse struct {
+	Branch string
+}
+
+func (s *ProjectService) DetectDefaultBranch(ctx context.Context, req DetectDefaultBranchRequest) (DetectDefaultBranchResponse, error) {
+	project, err := s.repo.Get(ctx, req.ProjectID)
+	if err != nil {
+		return DetectDefaultBranchResponse{}, err
+	}
+	branch, err := s.git.GetDefaultBranch(ctx, project.Path)
+	if err != nil {
+		return DetectDefaultBranchResponse{}, err
+	}
+	return DetectDefaultBranchResponse{Branch: branch}, nil
 }

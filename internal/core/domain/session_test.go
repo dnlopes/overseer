@@ -55,13 +55,10 @@ func TestNewSession_TrimsName(t *testing.T) {
 	}
 }
 
-func TestNewSession_AcceptsZeroProjectIDAsUnassigned(t *testing.T) {
-	s, err := NewSession("orphan", uuid.Nil)
-	if err != nil {
-		t.Fatalf("NewSession() error = %v, want nil for unassigned project", err)
-	}
-	if s.ProjectID != uuid.Nil {
-		t.Fatalf("NewSession() ProjectID = %v, want uuid.Nil", s.ProjectID)
+func TestNewSession_RejectsZeroProjectID(t *testing.T) {
+	_, err := NewSession("orphan", uuid.Nil)
+	if !errors.Is(err, ErrSessionEmptyProjectID) {
+		t.Fatalf("NewSession() error = %v, want %v", err, ErrSessionEmptyProjectID)
 	}
 }
 

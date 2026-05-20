@@ -9,8 +9,11 @@ var (
 	popupPrevFieldKeyBinding    = key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "previous field"))
 	popupSubmitFormKeyBinding   = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "create session"))
 	popupCloseKeyBinding        = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
-	popupSelectorNextKeyBinding = key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→/l", "next project"))
-	popupSelectorPrevKeyBinding = key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←/h", "previous project"))
+	popupSelectorNextKeyBinding = key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→/l", "next option"))
+	popupSelectorPrevKeyBinding = key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←/h", "previous option"))
+
+	repoPickerEnterPasteKeyBinding = key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("ctrl+p", "paste new path"))
+	repoPickerExitPasteKeyBinding  = key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("ctrl+l", "back to list"))
 
 	jumpUpKeyBinding      = key.NewBinding(key.WithKeys("ctrl+up"), key.WithHelp("ctrl+↑", "jump up"))
 	jumpDownKeyBinding    = key.NewBinding(key.WithKeys("ctrl+down"), key.WithHelp("ctrl+↓", "jump down"))

@@ -54,19 +54,6 @@ type ProjectRegisteredMsg struct{ Project domain.Project }
 
 type ProjectRegisterErrMsg struct{ Err error }
 
-type ProjectSelectedMsg struct{ ID string }
-
-type NewProjectPopupCloseMsg struct{}
-
-type LeftPaneTab int
-
-const (
-	LeftPaneTabSessions LeftPaneTab = iota
-	LeftPaneTabProjects
-)
-
-type LeftPaneTabChangedMsg struct{ Tab LeftPaneTab }
-
 type JobsTickMsg struct{ JobID string }
 
 type JobsBatchMsg struct{ Cmds []tea.Cmd }

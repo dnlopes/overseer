@@ -290,31 +290,6 @@ func TestSessionStore_LegacySessionsHaveEmptyAgentCommandAfterReload(t *testing.
 	}
 }
 
-func TestSessionStore_ProjectLessSessionsHaveEmptyWorktreeAfterReload(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "data.json")
-	logger := discardLogger()
-	ctx := context.Background()
-
-	sess := makeSession(t, "orphan", uuid.Nil)
-
-	store1, _ := storage.New(path, logger)
-	if err := store1.Sessions().Save(ctx, sess); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	store2, _ := storage.New(path, logger)
-	got, err := store2.Sessions().Get(ctx, sess.ID)
-	if err != nil {
-		t.Fatalf("Get() error = %v", err)
-	}
-	if got.HasWorktree() {
-		t.Errorf("Get() HasWorktree() = true, want false (project-less)")
-	}
-	if got.WorktreePath != "" || got.BaseBranch != "" || got.FeatureBranch != "" {
-		t.Errorf("Get() worktree fields = %q/%q/%q, want empty", got.WorktreePath, got.BaseBranch, got.FeatureBranch)
-	}
-}
-
 func TestSessionStore_DeletePersistsAcrossReload(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data.json")
 	logger := discardLogger()

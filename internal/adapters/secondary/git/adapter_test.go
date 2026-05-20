@@ -142,3 +142,72 @@ func TestAdapter_IsGitRepoReturnsSentinelForMissingPath(t *testing.T) {
 		t.Fatalf("IsGitRepo() error = %v, want wrapped %v", err, domain.ErrProjectNotGitRepo)
 	}
 }
+
+func TestAdapter_GetDefaultBranchFallsBackToMain(t *testing.T) {
+	a, err := git.New(discardLogger())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	repo := seedRepo(t)
+
+	branch, err := a.GetDefaultBranch(context.Background(), repo)
+	if err != nil {
+		t.Fatalf("GetDefaultBranch() error = %v", err)
+	}
+	if branch != "main" {
+		t.Fatalf("GetDefaultBranch() = %q, want %q (no origin → local main fallback)", branch, "main")
+	}
+}
+
+func TestAdapter_GetDefaultBranchFallsBackToMaster(t *testing.T) {
+	a, err := git.New(discardLogger())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	dir := t.TempDir()
+	gitCommands := [][]string{
+		{"init", "-q", "-b", "master"},
+		{"config", "user.email", "test@overseer.local"},
+		{"config", "user.name", "Overseer Test"},
+		{"commit", "--allow-empty", "-q", "-m", "init"},
+	}
+	for _, args := range gitCommands {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	branch, err := a.GetDefaultBranch(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("GetDefaultBranch() error = %v", err)
+	}
+	if branch != "master" {
+		t.Fatalf("GetDefaultBranch() = %q, want %q (no origin → local master fallback)", branch, "master")
+	}
+}
+
+func TestAdapter_GetDefaultBranchReturnsSentinelWhenNothingResolves(t *testing.T) {
+	a, err := git.New(discardLogger())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	dir := t.TempDir()
+	gitCommands := [][]string{
+		{"init", "-q", "-b", "trunk"},
+		{"config", "user.email", "test@overseer.local"},
+		{"config", "user.name", "Overseer Test"},
+		{"commit", "--allow-empty", "-q", "-m", "init"},
+	}
+	for _, args := range gitCommands {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	_, err = a.GetDefaultBranch(context.Background(), dir)
+	if !errors.Is(err, domain.ErrProjectNoDefaultBranch) {
+		t.Fatalf("GetDefaultBranch() error = %v, want wrapped %v", err, domain.ErrProjectNoDefaultBranch)
+	}
+}
