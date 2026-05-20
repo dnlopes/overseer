@@ -64,6 +64,8 @@ func TestAllStyles_NonEmptyRender(t *testing.T) {
 		{"Form.Field.LabelFocused", s.Form.Field.LabelFocused},
 		{"Form.Field.Input", s.Form.Field.Input},
 		{"Form.Field.Error", s.Form.Field.Error},
+		{"Danger.Title", s.Danger.Title},
+		{"Danger.Body", s.Danger.Body},
 		{"Modal.Box", s.Modal.Box},
 		{"Badge.Key", s.Badge.Key},
 		{"Badge.Label", s.Badge.Label},

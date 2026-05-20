@@ -990,3 +990,262 @@ func TestSessionService_AttachAgent_TmuxAdapterErrorWrapped(t *testing.T) {
 		t.Fatalf("AttachAgent() error = %v, want wrapped %v", err, adapterErr)
 	}
 }
+
+// --- Delete ---
+
+// pinWorktreeRoot points paths.WorktreeRoot() at an isolated temp directory
+// for the duration of the test by overriding XDG_DATA_HOME. Returns the
+// resulting worktree root path so callers can build matching session paths.
+func pinWorktreeRoot(t *testing.T) string {
+	t.Helper()
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	return paths.WorktreeRoot()
+}
+
+func TestSessionService_Delete_HappyPath_ProjectBackedSession(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	project := testutil.MakeProject("/repo/overseer", "overseer")
+	project.ID = overseerID
+	projects.EXPECT().Get(mock.Anything, overseerID).Return(project, nil).Once()
+	git.EXPECT().RemoveWorktree(mock.Anything, "/repo/overseer", sess.WorktreePath).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil", err)
+	}
+}
+
+func TestSessionService_Delete_HappyPath_ProjectlessSessionSkipsFilesystem(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil", err)
+	}
+}
+
+func TestSessionService_Delete_NotFound(t *testing.T) {
+	missingID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, missingID).
+		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: missingID})
+
+	if !errors.Is(err, domain.ErrSessionNotFound) {
+		t.Fatalf("Delete() error = %v, want %v", err, domain.ErrSessionNotFound)
+	}
+}
+
+func TestSessionService_Delete_WorktreePathOutsideRoot_Refused(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSessionWithWorktree(
+		"malicious",
+		uuid.New(),
+		"/etc/passwd",
+		"main",
+		"overseer/malicious",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, domain.ErrSessionWorktreePathOutsideRoot) {
+		t.Fatalf("Delete() error = %v, want %v", err, domain.ErrSessionWorktreePathOutsideRoot)
+	}
+}
+
+func TestSessionService_Delete_WorktreePathSiblingOfRoot_Refused(t *testing.T) {
+	root := pinWorktreeRoot(t)
+	sess := testutil.MakeSessionWithWorktree(
+		"sneaky",
+		uuid.New(),
+		root+"-evil/abc",
+		"main",
+		"overseer/sneaky",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, domain.ErrSessionWorktreePathOutsideRoot) {
+		t.Fatalf("Delete() error = %v, want %v (root=%q)", err, domain.ErrSessionWorktreePathOutsideRoot, root)
+	}
+}
+
+func TestSessionService_Delete_ProjectMissing_StillDeletesSessionAndTmux(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	projects.EXPECT().Get(mock.Anything, overseerID).
+		Return(domain.Project{}, domain.ErrProjectNotFound).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil when project missing", err)
+	}
+}
+
+func TestSessionService_Delete_ProjectLookupErrorBubblesUp(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	lookupErr := errors.New("project store unavailable")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	projects.EXPECT().Get(mock.Anything, overseerID).Return(domain.Project{}, lookupErr).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, lookupErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, lookupErr)
+	}
+}
+
+func TestSessionService_Delete_GitRemoveWorktreeErrorAbortsBeforeTmuxAndDB(t *testing.T) {
+	pinWorktreeRoot(t)
+	overseerID := uuid.New()
+	sess := testutil.MakeSessionWithWorktree(
+		"alpha",
+		overseerID,
+		paths.SessionWorktreePath(uuid.New()),
+		"main",
+		"overseer/alpha",
+	)
+	project := testutil.MakeProject("/repo/overseer", "overseer")
+	project.ID = overseerID
+	gitErr := errors.New("git worktree busy")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	projects.EXPECT().Get(mock.Anything, overseerID).Return(project, nil).Once()
+	git.EXPECT().RemoveWorktree(mock.Anything, project.Path, sess.WorktreePath).Return(gitErr).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, gitErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, gitErr)
+	}
+}
+
+func TestSessionService_Delete_TmuxSessionAlreadyGone_StillDeletes(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{}, domain.ErrTmuxSessionNotFound).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("Delete() error = %v, want nil when tmux session is already gone", err)
+	}
+}
+
+func TestSessionService_Delete_TmuxInspectErrorBubblesUp(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	inspectErr := errors.New("tmux server unreachable")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{}, inspectErr).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, inspectErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, inspectErr)
+	}
+}
+
+func TestSessionService_Delete_TmuxKillErrorAbortsBeforeDB(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	killErr := errors.New("tmux refused kill")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(killErr).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, killErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, killErr)
+	}
+}
+
+func TestSessionService_Delete_RepoDeleteErrorBubblesUp(t *testing.T) {
+	pinWorktreeRoot(t)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	deleteErr := errors.New("storage write failed")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(deleteErr).Once()
+
+	svc := NewSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Delete(context.Background(), DeleteSessionRequest{ID: sess.ID})
+
+	if !errors.Is(err, deleteErr) {
+		t.Fatalf("Delete() error = %v, want wrapped %v", err, deleteErr)
+	}
+}

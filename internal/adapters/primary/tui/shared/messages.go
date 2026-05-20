@@ -35,6 +35,14 @@ type SessionAttachReadyMsg struct {
 
 type SessionAttachedMsg struct{ Err error }
 
+type SessionDeleteRequestedMsg struct{ Session domain.Session }
+
+type SessionDeletedMsg struct{}
+
+type SessionDeleteErrMsg struct{ Err error }
+
+type NewSessionDeletePopupCloseMsg struct{}
+
 type ProjectsLoadedMsg struct {
 	Projects []domain.Project
 	Err      error

@@ -213,6 +213,41 @@ func TestAssignWorktree_Validation(t *testing.T) {
 	}
 }
 
+func TestWorktreeIsInsideRoot(t *testing.T) {
+	tests := []struct {
+		name         string
+		worktreePath string
+		root         string
+		want         bool
+	}{
+		{name: "no worktree is trivially inside", worktreePath: "", root: "/data/worktrees", want: true},
+		{name: "direct child of root", worktreePath: "/data/worktrees/abc-123", root: "/data/worktrees", want: true},
+		{name: "deeper descendant of root", worktreePath: "/data/worktrees/abc/nested/file", root: "/data/worktrees", want: true},
+		{name: "root with trailing slash still matches child", worktreePath: "/data/worktrees/abc", root: "/data/worktrees/", want: true},
+		{name: "exact root path is rejected", worktreePath: "/data/worktrees", root: "/data/worktrees", want: false},
+		{name: "sibling sharing textual prefix is rejected", worktreePath: "/data/worktrees-evil/abc", root: "/data/worktrees", want: false},
+		{name: "parent of root is rejected", worktreePath: "/data", root: "/data/worktrees", want: false},
+		{name: "unrelated absolute path is rejected", worktreePath: "/etc/passwd", root: "/data/worktrees", want: false},
+		{name: "home directory is rejected", worktreePath: "/home/user", root: "/data/worktrees", want: false},
+		{name: "empty root rejects any non-empty path", worktreePath: "/data/worktrees/abc", root: "", want: false},
+		{name: "relative root rejects any non-empty path", worktreePath: "/data/worktrees/abc", root: "data/worktrees", want: false},
+		{name: "root with surrounding whitespace still validates", worktreePath: "/data/worktrees/abc", root: "  /data/worktrees  ", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := NewSession("alpha", uuid.New())
+			if tt.worktreePath != "" {
+				s.WorktreePath = tt.worktreePath
+			}
+			if got := s.WorktreeIsInsideRoot(tt.root); got != tt.want {
+				t.Fatalf("WorktreeIsInsideRoot(%q) with WorktreePath=%q = %v, want %v",
+					tt.root, tt.worktreePath, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRename_UpdatesNameAndUpdatedAt(t *testing.T) {
 	s, _ := NewSession("alpha", uuid.New())
 	originalUpdated := s.UpdatedAt

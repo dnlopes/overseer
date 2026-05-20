@@ -7,6 +7,7 @@ func DarkTheme() Theme {
 		Primary:      lipgloss.Color("#7C3AED"),
 		Accent:       lipgloss.Color("#10B981"),
 		Warning:      lipgloss.Color("#F59E0B"),
+		Danger:       lipgloss.Color("#EF4444"),
 		Muted:        lipgloss.Color("#6B7280"),
 		Text:         lipgloss.Color("#F9FAFB"),
 		Subtext:      lipgloss.Color("#9CA3AF"),

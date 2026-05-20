@@ -332,6 +332,69 @@ func navigateToTop(t *testing.T, m tea.Model) tea.Model {
 	return m
 }
 
+func TestModel_DKeyEmitsDeleteRequestedForSelectedSession(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.New(), newSessionService(t))
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSession("alpha", overseerID)
+
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha}})
+	_, cmd := updated.(Model).Update(keyPress("d"))
+
+	if cmd == nil {
+		t.Fatalf("Update(d) command = nil, want delete-requested emit")
+	}
+	msg, ok := cmd().(shared.SessionDeleteRequestedMsg)
+	if !ok {
+		t.Fatalf("Update(d) msg type = %T, want shared.SessionDeleteRequestedMsg", cmd())
+	}
+	if msg.Session.ID != alpha.ID {
+		t.Fatalf("SessionDeleteRequestedMsg.Session.ID = %v, want %v", msg.Session.ID, alpha.ID)
+	}
+	if msg.Session.Name != "alpha" {
+		t.Fatalf("SessionDeleteRequestedMsg.Session.Name = %q, want %q", msg.Session.Name, "alpha")
+	}
+}
+
+func TestModel_DKeyWithGroupNodeSelected_NoOp(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.New(), newSessionService(t))
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSession("alpha", overseerID)
+
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha}})
+	updated, _ = updated.(Model).Update(keyPress("k"))
+	_, cmd := updated.(Model).Update(keyPress("d"))
+
+	if cmd != nil {
+		t.Fatalf("Update(d) command = %#v, want nil when group node is selected", cmd)
+	}
+}
+
+func TestModel_SessionDeletedMsg_TriggersReload(t *testing.T) {
+	alpha := testutil.MakeSession("alpha", uuid.New())
+	svc, repo := newSessionServiceWithRepo(t)
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{alpha}, nil).Once()
+	model := New(styles.New(), svc)
+
+	_, cmd := model.Update(shared.SessionDeletedMsg{})
+
+	if cmd == nil {
+		t.Fatalf("Update(SessionDeletedMsg) command = nil, want reload command")
+	}
+	msg, ok := cmd().(shared.SessionsLoadedMsg)
+	if !ok {
+		t.Fatalf("Reload msg type = %T, want shared.SessionsLoadedMsg", cmd())
+	}
+	if msg.Err != nil {
+		t.Fatalf("Reload SessionsLoadedMsg.Err = %v, want nil", msg.Err)
+	}
+}
+
 func newSessionService(t *testing.T) service.SessionService {
 	t.Helper()
 	svc, _ := newSessionServiceWithRepo(t)

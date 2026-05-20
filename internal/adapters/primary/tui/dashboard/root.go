@@ -30,6 +30,7 @@ const (
 	popupNone popupKind = iota
 	popupNewSession
 	popupNewProject
+	popupDeleteSession
 )
 
 type Model struct {
@@ -38,6 +39,7 @@ type Model struct {
 	detailsModel   DetailsModel
 	helpBar        shared.HelpBarModel
 	createForm     sessionui.CreateFormModel
+	deleteForm     sessionui.DeleteFormModel
 	registerForm   projectui.RegisterFormModel
 	scheduler      jobs.Model
 	activePopup    popupKind
@@ -105,7 +107,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
 		return m, cmd
-	case shared.NewSessionPopupCloseMsg, shared.NewProjectPopupCloseMsg:
+	case shared.SessionDeleteRequestedMsg:
+		m.deleteForm = sessionui.NewDeleteForm(m.styles, m.sessionsService, msg.Session)
+		m.activePopup = popupDeleteSession
+		return m, m.deleteForm.Init()
+	case shared.SessionDeletedMsg:
+		m.activePopup = popupNone
+		var cmd tea.Cmd
+		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
+		return m, cmd
+	case shared.NewSessionPopupCloseMsg, shared.NewProjectPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg:
 		m.activePopup = popupNone
 		return m, nil
 	case shared.LeftPaneTabChangedMsg:
@@ -250,6 +261,10 @@ func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.registerForm, cmd = shared.UpdateModel(m.registerForm, msg)
 		return m, cmd
+	case popupDeleteSession:
+		var cmd tea.Cmd
+		m.deleteForm, cmd = shared.UpdateModel(m.deleteForm, msg)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -294,6 +309,8 @@ func (m Model) popupView() string {
 		return m.createForm.View().Content
 	case popupNewProject:
 		return m.registerForm.View().Content
+	case popupDeleteSession:
+		return m.deleteForm.View().Content
 	}
 	return ""
 }

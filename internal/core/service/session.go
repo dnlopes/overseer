@@ -336,6 +336,97 @@ func (s *SessionService) AttachAgent(ctx context.Context, req AttachAgentRequest
 	return AttachAgentResponse{Command: cmd}, nil
 }
 
+// --- Delete ---
+
+type DeleteSessionRequest struct {
+	ID uuid.UUID
+}
+
+type DeleteSessionResponse struct{}
+
+// Delete tears down a session in three steps, in this order:
+//
+//  1. If the session has a worktree, the path is verified to live inside
+//     paths.WorktreeRoot() (defence in depth against a tampered DB row) and
+//     the git worktree is removed. If the owning project no longer exists in
+//     the repository, git removal is skipped with a warning — the rest of
+//     the teardown still proceeds.
+//  2. The associated tmux session is killed, if it still exists. A missing
+//     tmux session is not an error: the user may have killed it manually or
+//     the tmux server may have restarted.
+//  3. The session row is deleted from the repository last, so any failure in
+//     steps 1 or 2 leaves a retriable session row instead of an orphaned
+//     worktree or tmux session paired with no DB record.
+func (s *SessionService) Delete(ctx context.Context, req DeleteSessionRequest) (DeleteSessionResponse, error) {
+	sess, err := s.repo.Get(ctx, req.ID)
+	if err != nil {
+		return DeleteSessionResponse{}, err
+	}
+
+	if sess.HasWorktree() {
+		if !sess.WorktreeIsInsideRoot(paths.WorktreeRoot()) {
+			s.logger.ErrorContext(ctx, "session worktree path outside managed root, refusing to delete",
+				slog.String("id", sess.ID.String()),
+				slog.String("worktree_path", sess.WorktreePath),
+				slog.String("worktree_root", paths.WorktreeRoot()),
+			)
+			return DeleteSessionResponse{}, domain.ErrSessionWorktreePathOutsideRoot
+		}
+		if err := s.removeWorktreeForSession(ctx, sess); err != nil {
+			return DeleteSessionResponse{}, err
+		}
+	}
+
+	if err := s.killTmuxIfExists(ctx, sess.ID.String()); err != nil {
+		return DeleteSessionResponse{}, err
+	}
+
+	if err := s.repo.Delete(ctx, sess.ID); err != nil {
+		return DeleteSessionResponse{}, fmt.Errorf("delete session: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "session deleted",
+		slog.String("id", sess.ID.String()),
+		slog.String("name", sess.Name),
+	)
+	return DeleteSessionResponse{}, nil
+}
+
+func (s *SessionService) removeWorktreeForSession(ctx context.Context, sess domain.Session) error {
+	project, err := s.projects.Get(ctx, sess.ProjectID)
+	if err != nil {
+		if errors.Is(err, domain.ErrProjectNotFound) {
+			s.logger.WarnContext(ctx, "owning project missing, skipping git worktree removal",
+				slog.String("session_id", sess.ID.String()),
+				slog.String("project_id", sess.ProjectID.String()),
+				slog.String("worktree_path", sess.WorktreePath),
+			)
+			return nil
+		}
+		return fmt.Errorf("lookup project: %w", err)
+	}
+	if err := s.git.RemoveWorktree(ctx, project.Path, sess.WorktreePath); err != nil {
+		return fmt.Errorf("remove git worktree: %w", err)
+	}
+	return nil
+}
+
+func (s *SessionService) killTmuxIfExists(ctx context.Context, tmuxID string) error {
+	if _, err := s.tmux.GetSession(ctx, tmuxID); err != nil {
+		if errors.Is(err, domain.ErrTmuxSessionNotFound) {
+			s.logger.InfoContext(ctx, "tmux session already gone, nothing to kill",
+				slog.String("id", tmuxID),
+			)
+			return nil
+		}
+		return fmt.Errorf("inspect tmux session: %w", err)
+	}
+	if err := s.tmux.KillSession(ctx, tmuxID); err != nil {
+		return fmt.Errorf("kill tmux session: %w", err)
+	}
+	return nil
+}
+
 func (s *SessionService) ensureTmuxSession(ctx context.Context, tmuxID, startDir, shellCommand string) error {
 	_, err := s.tmux.GetSession(ctx, tmuxID)
 	if err == nil {

@@ -114,7 +114,11 @@ type Styles struct {
 		Default   lipgloss.Style
 		Highlight lipgloss.Style
 	}
-	Form  FormStyles
+	Form   FormStyles
+	Danger struct {
+		Title lipgloss.Style
+		Body  lipgloss.Style
+	}
 	Modal struct {
 		Box          lipgloss.Style
 		Overlay      color.Color
@@ -219,6 +223,13 @@ func New() *Styles {
 					Blink: true,
 				},
 			},
+		},
+		Danger: struct {
+			Title lipgloss.Style
+			Body  lipgloss.Style
+		}{
+			Title: lipgloss.NewStyle().Foreground(theme.Danger).Bold(true),
+			Body:  lipgloss.NewStyle().Foreground(theme.Danger),
 		},
 		Modal: struct {
 			Box          lipgloss.Style

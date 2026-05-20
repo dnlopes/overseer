@@ -103,6 +103,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case shared.SessionCreatedMsg:
 		return m, m.loadSessions()
+	case shared.SessionDeletedMsg:
+		return m, m.loadSessions()
 	case components.TreeSelectMsg[sessionNode]:
 		if msg.Item.kind == sessionNodeSession {
 			return m, shared.Emit(shared.SessionSelectedMsg{ID: msg.Item.sessionID})
@@ -143,8 +145,30 @@ func (m *Model) handleNavigationKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		return m.reorderSelected(-1), true
 	case key.Matches(msg, reorderDownKeyBinding):
 		return m.reorderSelected(1), true
+	case key.Matches(msg, deleteSessionKeyBinding):
+		if cmd := m.requestDeleteSelected(); cmd != nil {
+			return cmd, true
+		}
+		return nil, true
 	}
 	return nil, false
+}
+
+func (m Model) requestDeleteSelected() tea.Cmd {
+	cur, ok := m.tree.Selected()
+	if !ok || cur.kind != sessionNodeSession {
+		return nil
+	}
+	id, err := uuid.Parse(cur.sessionID)
+	if err != nil {
+		return nil
+	}
+	for _, sess := range m.sessions {
+		if sess.ID == id {
+			return shared.Emit(shared.SessionDeleteRequestedMsg{Session: sess})
+		}
+	}
+	return nil
 }
 
 func (m Model) reorderSelected(direction int) tea.Cmd {
