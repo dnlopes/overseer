@@ -21,6 +21,7 @@ const (
 	FieldNameSelectedIndex int = iota
 	FieldProjectSelectedIndex
 	FieldLauncherSelectedIndex
+	FieldEditorSelectedIndex
 )
 
 type CreateFormModel struct {
@@ -29,14 +30,16 @@ type CreateFormModel struct {
 	projects        []domain.Project
 	launchers       []domain.Launcher
 	launcherIdx     int
+	editors         []domain.Editor
+	editorIdx       int
 	focusIndex      shared.CircularInt
 	errMsg          string
 	sessionsService service.SessionService
 	styles          *styles.Styles
 }
 
-// NewCreateForm builds the session-create form with the configured launcher choices.
-func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, projects []domain.Project, launchers []domain.Launcher) CreateFormModel {
+// NewCreateForm builds the session-create form with the configured launcher and editor choices.
+func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, projects []domain.Project, launchers []domain.Launcher, editors []domain.Editor) CreateFormModel {
 	nameInput := textinput.New()
 	nameInput.Placeholder = "Session name"
 	nameInput.CharLimit = 100
@@ -50,7 +53,9 @@ func NewCreateForm(s *styles.Styles, sessionsService service.SessionService, pro
 		projects:        projects,
 		launchers:       launchers,
 		launcherIdx:     0,
-		focusIndex:      shared.NewCircularInt(0, 2),
+		editors:         editors,
+		editorIdx:       0,
+		focusIndex:      shared.NewCircularInt(0, 3),
 		sessionsService: sessionsService,
 		styles:          s,
 	}
@@ -99,6 +104,16 @@ func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+		if m.focusIndex.Value() == FieldEditorSelectedIndex {
+			if key.Matches(msg, popupSelectorNextKeyBinding) {
+				m.cycleEditor(1)
+				return m, nil
+			}
+			if key.Matches(msg, popupSelectorPrevKeyBinding) {
+				m.cycleEditor(-1)
+				return m, nil
+			}
+		}
 	}
 
 	if msg, ok := msg.(shared.SessionCreateErrMsg); ok {
@@ -135,11 +150,26 @@ func (m *CreateFormModel) cycleLauncher(direction int) {
 	m.launcherIdx = ((m.launcherIdx+direction)%choices + choices) % choices
 }
 
+func (m *CreateFormModel) cycleEditor(direction int) {
+	choices := len(m.editors)
+	if choices == 0 {
+		return
+	}
+	m.editorIdx = ((m.editorIdx+direction)%choices + choices) % choices
+}
+
 func (m CreateFormModel) resolvedAgentCommand() string {
 	if len(m.launchers) == 0 {
 		return ""
 	}
 	return m.launchers[m.launcherIdx].Command
+}
+
+func (m CreateFormModel) resolvedEditorCommand() string {
+	if len(m.editors) == 0 {
+		return ""
+	}
+	return m.editors[m.editorIdx].Command
 }
 
 func (m CreateFormModel) selectedProjectID() uuid.UUID {
@@ -165,9 +195,10 @@ func (m CreateFormModel) submit() (tea.Model, tea.Cmd) {
 
 	m.errMsg = ""
 	req := service.CreateSessionRequest{
-		Name:         name,
-		ProjectID:    m.selectedProjectID(),
-		AgentCommand: m.resolvedAgentCommand(),
+		Name:          name,
+		ProjectID:     m.selectedProjectID(),
+		AgentCommand:  m.resolvedAgentCommand(),
+		EditorCommand: m.resolvedEditorCommand(),
 	}
 	return m, func() tea.Msg {
 		resp, err := m.sessionsService.Create(context.Background(), req)
@@ -202,6 +233,10 @@ func (m CreateFormModel) View() tea.View {
 	b.WriteByte('\n')
 	b.WriteString(m.launcherSelectorView())
 	b.WriteByte('\n')
+	b.WriteString(m.labelStyle(FieldEditorSelectedIndex).Render("Editor"))
+	b.WriteByte('\n')
+	b.WriteString(m.editorSelectorView())
+	b.WriteByte('\n')
 	b.WriteString(s.Error.Render(m.errMsg))
 	b.WriteByte('\n')
 	if m.errMsg != "" {
@@ -234,6 +269,18 @@ func (m CreateFormModel) launcherSelectorView() string {
 			continue
 		}
 		parts = append(parts, m.styles.ListRow.Normal.Render("  "+l.DisplayName+"  "))
+	}
+	return strings.Join(parts, " ")
+}
+
+func (m CreateFormModel) editorSelectorView() string {
+	parts := make([]string, 0, len(m.editors))
+	for i, e := range m.editors {
+		if i == m.editorIdx {
+			parts = append(parts, m.styles.ListRow.Selected.Render("[ "+e.DisplayName+" ]"))
+			continue
+		}
+		parts = append(parts, m.styles.ListRow.Normal.Render("  "+e.DisplayName+"  "))
 	}
 	return strings.Join(parts, " ")
 }

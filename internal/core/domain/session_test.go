@@ -147,6 +147,55 @@ func TestAssignAgentCommand_RejectsEmpty(t *testing.T) {
 	}
 }
 
+func TestAssignEditorCommand_StoresAndUpdatesTimestamp(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	originalUpdated := s.UpdatedAt
+	time.Sleep(time.Millisecond)
+
+	if err := s.AssignEditorCommand("code"); err != nil {
+		t.Fatalf("AssignEditorCommand() error = %v", err)
+	}
+	if s.EditorCommand != "code" {
+		t.Fatalf("EditorCommand = %q, want %q", s.EditorCommand, "code")
+	}
+	if !s.UpdatedAt.After(originalUpdated) {
+		t.Fatalf("UpdatedAt = %v, want after %v", s.UpdatedAt, originalUpdated)
+	}
+}
+
+func TestAssignEditorCommand_TrimsCommand(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	if err := s.AssignEditorCommand("  code --wait  "); err != nil {
+		t.Fatalf("AssignEditorCommand() error = %v", err)
+	}
+	if s.EditorCommand != "code --wait" {
+		t.Fatalf("EditorCommand = %q, want %q", s.EditorCommand, "code --wait")
+	}
+}
+
+func TestAssignEditorCommand_RejectsEmpty(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  string
+	}{
+		{name: "empty", cmd: ""},
+		{name: "blank", cmd: "   "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := NewSession("alpha", uuid.New())
+			err := s.AssignEditorCommand(tt.cmd)
+			if !errors.Is(err, ErrSessionEmptyEditorCommand) {
+				t.Fatalf("AssignEditorCommand(%q) error = %v, want %v", tt.cmd, err, ErrSessionEmptyEditorCommand)
+			}
+			if s.EditorCommand != "" {
+				t.Fatalf("EditorCommand = %q, want empty after rejected assignment", s.EditorCommand)
+			}
+		})
+	}
+}
+
 func TestAssignWorktree_PopulatesEnsemble(t *testing.T) {
 	s, _ := NewSession("alpha", uuid.New())
 	originalUpdated := s.UpdatedAt

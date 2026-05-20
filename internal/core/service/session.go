@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -27,11 +28,13 @@ type SessionService struct {
 	git             domain.GitAdapter
 	pathsResolver   paths.Resolver
 	defaultLauncher domain.Launcher
+	defaultEditor   domain.Editor
 	logger          *slog.Logger
 }
 
 // NewSessionService wires the session use-cases. defaultLauncher is used by
-// AttachAgent when a session's AgentCommand is empty (pre-launcher sessions).
+// AttachAgent when a session's AgentCommand is empty (pre-launcher sessions);
+// defaultEditor plays the same role for OpenEditor and Session.EditorCommand.
 func NewSessionService(
 	repo domain.SessionRepository,
 	projects domain.ProjectRepository,
@@ -39,6 +42,7 @@ func NewSessionService(
 	git domain.GitAdapter,
 	resolver paths.Resolver,
 	defaultLauncher domain.Launcher,
+	defaultEditor domain.Editor,
 	logger *slog.Logger,
 ) *SessionService {
 	return &SessionService{
@@ -48,6 +52,7 @@ func NewSessionService(
 		git:             git,
 		pathsResolver:   resolver,
 		defaultLauncher: defaultLauncher,
+		defaultEditor:   defaultEditor,
 		logger:          logger,
 	}
 }
@@ -55,9 +60,10 @@ func NewSessionService(
 // --- Create ---
 
 type CreateSessionRequest struct {
-	Name         string
-	ProjectID    uuid.UUID
-	AgentCommand string
+	Name          string
+	ProjectID     uuid.UUID
+	AgentCommand  string
+	EditorCommand string
 }
 
 type CreateSessionResponse struct {
@@ -72,6 +78,12 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 
 	if req.AgentCommand != "" {
 		if err := sess.AssignAgentCommand(req.AgentCommand); err != nil {
+			return CreateSessionResponse{}, err
+		}
+	}
+
+	if req.EditorCommand != "" {
+		if err := sess.AssignEditorCommand(req.EditorCommand); err != nil {
 			return CreateSessionResponse{}, err
 		}
 	}
@@ -362,6 +374,64 @@ func (s *SessionService) AttachAgent(ctx context.Context, req AttachAgentRequest
 	)
 
 	return AttachAgentResponse{Command: cmd}, nil
+}
+
+// --- OpenEditor ---
+
+type OpenEditorRequest struct {
+	ID uuid.UUID
+}
+
+type OpenEditorResponse struct {
+	Command *exec.Cmd
+}
+
+// OpenEditor launches the configured editor at the session's worktree (or
+// $HOME for project-less sessions) as a detached background process: the
+// TUI keeps running, no alt-screen flash.
+//
+// The returned *exec.Cmd has already been Start()ed — do NOT call Start/Run
+// on it again; it is exposed only for observability. A goroutine Wait()s on
+// the child to reap it.
+//
+// exec.Command, NOT exec.CommandContext, so the editor outlives ctx.
+// Terminal editors (vim/nvim/helix) are NOT supported by this fire-and-forget
+// model — they need the terminal we never release.
+func (s *SessionService) OpenEditor(ctx context.Context, req OpenEditorRequest) (OpenEditorResponse, error) {
+	sess, err := s.repo.Get(ctx, req.ID)
+	if err != nil {
+		return OpenEditorResponse{}, err
+	}
+
+	editorCmd := sess.EditorCommand
+	if editorCmd == "" {
+		editorCmd = s.defaultEditor.Command
+	}
+	if editorCmd == "" {
+		return OpenEditorResponse{}, domain.ErrSessionNoEditorCommandAvailable
+	}
+
+	workDir, err := sessionStartDir(sess)
+	if err != nil {
+		return OpenEditorResponse{}, err
+	}
+
+	parts := strings.Fields(editorCmd)
+	args := append(parts[1:], workDir)
+	cmd := exec.Command(parts[0], args...)
+	cmd.Dir = workDir
+
+	if err := cmd.Start(); err != nil {
+		return OpenEditorResponse{}, fmt.Errorf("start editor: %w", err)
+	}
+	go func() { _ = cmd.Wait() }()
+
+	s.logger.InfoContext(ctx, "editor launched",
+		slog.String("id", sess.ID.String()),
+		slog.String("editor", parts[0]),
+		slog.String("dir", workDir),
+	)
+	return OpenEditorResponse{Command: cmd}, nil
 }
 
 // --- PreviewSession ---

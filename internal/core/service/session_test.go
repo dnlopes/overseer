@@ -52,7 +52,8 @@ func newTestSessionService(
 	logger *slog.Logger,
 ) *SessionService {
 	launcher, _ := domain.NewLauncher("OpenCode", "opencode")
-	return NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), launcher, logger)
+	editor, _ := domain.NewEditor("True", "true")
+	return NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), launcher, editor, logger)
 }
 
 // --- Create ---
@@ -958,7 +959,8 @@ func TestSessionService_AttachAgent_NoSessionCommandAndNoDefaultLauncher_Returns
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
 
-	svc := NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), domain.Launcher{}, testLogger())
+	editor, _ := domain.NewEditor("VSCode", "code")
+	svc := NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), domain.Launcher{}, editor, testLogger())
 	_, err := svc.AttachAgent(context.Background(), AttachAgentRequest{ID: sess.ID})
 
 	if !errors.Is(err, domain.ErrSessionNoAgentCommandAvailable) {
@@ -1448,5 +1450,213 @@ func TestSessionService_Delete_RepoDeleteErrorBubblesUp(t *testing.T) {
 
 	if !errors.Is(err, deleteErr) {
 		t.Fatalf("Delete() error = %v, want wrapped %v", err, deleteErr)
+	}
+}
+
+// --- Create with EditorCommand ---
+
+func TestSessionService_Create_WithEditorCommand(t *testing.T) {
+	t.Setenv("HOME", "/tmp/overseer-home")
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").
+		Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").
+		Return("tmux-alpha-agent", nil).Once()
+
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.Create(context.Background(), CreateSessionRequest{
+		Name:          "alpha",
+		ProjectID:     uuid.Nil,
+		AgentCommand:  "opencode",
+		EditorCommand: "cursor",
+	})
+
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if resp.Session.EditorCommand != "cursor" {
+		t.Fatalf("Create() Session.EditorCommand = %q, want %q", resp.Session.EditorCommand, "cursor")
+	}
+	if savedSession.EditorCommand != "cursor" {
+		t.Fatalf("SessionRepository.Save session.EditorCommand = %q, want %q", savedSession.EditorCommand, "cursor")
+	}
+}
+
+func TestSessionService_Create_RejectsInvalidEditorCommand(t *testing.T) {
+	repo, projects, tmux, git := newSessionMocks(t)
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.Create(context.Background(), CreateSessionRequest{
+		Name:          "alpha",
+		ProjectID:     uuid.Nil,
+		EditorCommand: "   ",
+	})
+
+	if !errors.Is(err, domain.ErrSessionEmptyEditorCommand) {
+		t.Fatalf("Create() error = %v, want %v", err, domain.ErrSessionEmptyEditorCommand)
+	}
+}
+
+// --- OpenEditor ---
+
+func TestSessionService_OpenEditor_ProjectBackedSession_LaunchesAtWorktree(t *testing.T) {
+	worktreePath := t.TempDir()
+	sess := testutil.MakeSessionWithWorktree("alpha", uuid.New(), worktreePath, "main", "overseer/alpha")
+	if err := sess.AssignEditorCommand("true"); err != nil {
+		t.Fatalf("seed AssignEditorCommand: %v", err)
+	}
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("OpenEditor() error = %v", err)
+	}
+	if resp.Command == nil {
+		t.Fatal("OpenEditor() Command = nil, want *exec.Cmd")
+	}
+	if resp.Command.Process == nil {
+		t.Fatal("OpenEditor() Command.Process = nil, want started process")
+	}
+	wantArgs := []string{"true", worktreePath}
+	if len(resp.Command.Args) != len(wantArgs) {
+		t.Fatalf("OpenEditor() Command.Args = %v, want %v", resp.Command.Args, wantArgs)
+	}
+	for i := range wantArgs {
+		if resp.Command.Args[i] != wantArgs[i] {
+			t.Fatalf("OpenEditor() Command.Args[%d] = %q, want %q", i, resp.Command.Args[i], wantArgs[i])
+		}
+	}
+	if resp.Command.Dir != worktreePath {
+		t.Fatalf("OpenEditor() Command.Dir = %q, want %q", resp.Command.Dir, worktreePath)
+	}
+}
+
+func TestSessionService_OpenEditor_ProjectLessSession_LaunchesAtHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	sess := testutil.MakeSession("orphan", uuid.Nil)
+	if err := sess.AssignEditorCommand("true"); err != nil {
+		t.Fatalf("seed AssignEditorCommand: %v", err)
+	}
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("OpenEditor() error = %v", err)
+	}
+	if resp.Command.Dir != home {
+		t.Fatalf("OpenEditor() Command.Dir = %q, want %q", resp.Command.Dir, home)
+	}
+	if resp.Command.Args[len(resp.Command.Args)-1] != home {
+		t.Fatalf("OpenEditor() final arg = %q, want %q", resp.Command.Args[len(resp.Command.Args)-1], home)
+	}
+}
+
+func TestSessionService_OpenEditor_MultiWordCommand_SplitsAndPassesArgs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	sess := testutil.MakeSession("alpha", uuid.Nil)
+	if err := sess.AssignEditorCommand("true --wait --new-window"); err != nil {
+		t.Fatalf("seed AssignEditorCommand: %v", err)
+	}
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("OpenEditor() error = %v", err)
+	}
+	wantArgs := []string{"true", "--wait", "--new-window", home}
+	if len(resp.Command.Args) != len(wantArgs) {
+		t.Fatalf("OpenEditor() Command.Args = %v, want %v", resp.Command.Args, wantArgs)
+	}
+	for i := range wantArgs {
+		if resp.Command.Args[i] != wantArgs[i] {
+			t.Fatalf("OpenEditor() Command.Args[%d] = %q, want %q", i, resp.Command.Args[i], wantArgs[i])
+		}
+	}
+}
+
+func TestSessionService_OpenEditor_EmptyEditorCommand_FallsBackToDefault(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	sess := testutil.MakeSession("alpha", uuid.Nil)
+	if sess.EditorCommand != "" {
+		t.Fatalf("test precondition: EditorCommand must start empty, got %q", sess.EditorCommand)
+	}
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sess.ID})
+
+	if err != nil {
+		t.Fatalf("OpenEditor() error = %v, want nil with default fallback", err)
+	}
+	if resp.Command.Args[0] != "true" {
+		t.Fatalf("OpenEditor() Command.Args[0] = %q, want %q (default editor)", resp.Command.Args[0], "true")
+	}
+}
+
+func TestSessionService_OpenEditor_BinaryNotFound_ReturnsError(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	sess := testutil.MakeSession("alpha", uuid.Nil)
+	if err := sess.AssignEditorCommand("/nonexistent/binary/that/does/not/exist"); err != nil {
+		t.Fatalf("seed AssignEditorCommand: %v", err)
+	}
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sess.ID})
+
+	if err == nil {
+		t.Fatal("OpenEditor() error = nil, want non-nil for nonexistent binary")
+	}
+}
+
+func TestSessionService_OpenEditor_NoSessionCommandAndNoDefaultEditor_ReturnsSentinel(t *testing.T) {
+	t.Setenv("HOME", "/tmp/overseer-home")
+	sess := testutil.MakeSession("alpha", uuid.Nil)
+	if sess.EditorCommand != "" {
+		t.Fatalf("test precondition: EditorCommand must start empty, got %q", sess.EditorCommand)
+	}
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	launcher, _ := domain.NewLauncher("OpenCode", "opencode")
+	svc := NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), launcher, domain.Editor{}, testLogger())
+	_, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sess.ID})
+
+	if !errors.Is(err, domain.ErrSessionNoEditorCommandAvailable) {
+		t.Fatalf("OpenEditor() error = %v, want ErrSessionNoEditorCommandAvailable", err)
+	}
+}
+
+func TestSessionService_OpenEditor_SessionNotFound(t *testing.T) {
+	sessID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sessID).Return(domain.Session{}, domain.ErrSessionNotFound).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sessID})
+
+	if !errors.Is(err, domain.ErrSessionNotFound) {
+		t.Fatalf("OpenEditor() error = %v, want ErrSessionNotFound", err)
 	}
 }

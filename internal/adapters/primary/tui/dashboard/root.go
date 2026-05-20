@@ -58,6 +58,7 @@ type Model struct {
 	sessionsService service.SessionService
 	projectsService service.ProjectService
 	launchers       []domain.Launcher
+	editors         []domain.Editor
 }
 
 func New(
@@ -66,6 +67,7 @@ func New(
 	projectsService service.ProjectService,
 	scheduler jobs.Model,
 	launchers []domain.Launcher,
+	editors []domain.Editor,
 	minWidth, minHeight int,
 ) Model {
 	sessionsModel := sessionui.New(styles, sessionsService)
@@ -82,6 +84,7 @@ func New(
 		sessionsService: sessionsService,
 		projectsService: projectsService,
 		launchers:       launchers,
+		editors:         editors,
 		minWidth:        minWidth,
 		minHeight:       minHeight,
 		leftPaneFocused: true,
@@ -146,6 +149,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 	case shared.SessionAttachedMsg:
 		return m, nil
+	case shared.SessionEditorLaunchedMsg:
+		return m, nil
 	case shared.JobsTickMsg, shared.JobsBatchMsg:
 		var cmd tea.Cmd
 		m.scheduler, cmd = m.scheduler.Update(msg)
@@ -199,7 +204,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	}
 	if m.leftPaneFocused {
 		if m.leftPane.SessionsActive() && key.Matches(msg, newSessionKeyBinding) {
-			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.cachedProjects, m.launchers)
+			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.cachedProjects, m.launchers, m.editors)
 			m.activePopup = popupNewSession
 			return m.createForm.Init(), true
 		}
@@ -215,6 +220,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		if m.leftPane.SessionsActive() && key.Matches(msg, attachAgentKeyBinding) {
 			if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
+				return cmd, true
+			}
+		}
+		if m.leftPane.SessionsActive() && key.Matches(msg, openEditorKeyBinding) {
+			if cmd := m.openSelectedSessionEditorCmd(); cmd != nil {
 				return cmd, true
 			}
 		}
@@ -251,6 +261,22 @@ func (m Model) attachSelectedSessionAgentCmd() tea.Cmd {
 	return func() tea.Msg {
 		resp, err := svc.AttachAgent(context.Background(), service.AttachAgentRequest{ID: sessID})
 		return shared.SessionAttachReadyMsg{Command: resp.Command, Err: err}
+	}
+}
+
+func (m Model) openSelectedSessionEditorCmd() tea.Cmd {
+	idStr := m.leftPane.SelectedSessionID()
+	if idStr == "" {
+		return nil
+	}
+	sessID, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil
+	}
+	svc := m.sessionsService
+	return func() tea.Msg {
+		_, err := svc.OpenEditor(context.Background(), service.OpenEditorRequest{ID: sessID})
+		return shared.SessionEditorLaunchedMsg{Err: err}
 	}
 }
 

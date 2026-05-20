@@ -20,7 +20,7 @@ import (
 )
 
 func TestCreateForm_DefaultsToNoProject(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
 
 	if form.selectedProjectID() != uuid.Nil {
 		t.Fatalf("default selected project = %v, want uuid.Nil", form.selectedProjectID())
@@ -33,7 +33,7 @@ func TestCreateForm_DefaultsToNoProject(t *testing.T) {
 func TestCreateForm_TabFocusesProjectSelectorAndArrowsCycle(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
 	widgets := testutil.MakeProject("/repo/widgets", "Widgets")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets}, testLaunchers(t))
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets}, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("right"))
@@ -50,7 +50,7 @@ func TestCreateForm_TabFocusesProjectSelectorAndArrowsCycle(t *testing.T) {
 func TestCreateForm_LeftFromNoneWrapsToLastProject(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
 	widgets := testutil.MakeProject("/repo/widgets", "Widgets")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets}, testLaunchers(t))
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer, widgets}, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("left"))
@@ -70,7 +70,7 @@ func TestCreateForm_SubmitCreatesSessionWithSelectedProject(t *testing.T) {
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, []domain.Project{overseer}, testLaunchers(t))
+	form := NewCreateForm(styles.New(), svc, []domain.Project{overseer}, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("alpha"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -99,7 +99,7 @@ func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
 	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").Return("tmux-orphan-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t))
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("orphan"))
 	_, cmd := updated.(CreateFormModel).Update(formKeyPress("enter"))
@@ -118,7 +118,7 @@ func TestCreateForm_SubmitWithNoneCreatesProjectlessSession(t *testing.T) {
 
 func TestCreateForm_ViewShowsCurrentProjectLabel(t *testing.T) {
 	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer}, testLaunchers(t))
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), []domain.Project{overseer}, testLaunchers(t), testEditors(t))
 
 	view := form.View().Content
 	if !strings.Contains(view, "(none)") {
@@ -127,7 +127,7 @@ func TestCreateForm_ViewShowsCurrentProjectLabel(t *testing.T) {
 }
 
 func TestCreateForm_DefaultsToOpencodeLauncher(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
 
 	if form.resolvedAgentCommand() != "opencode" {
 		t.Fatalf("default resolved agent command = %q, want %q", form.resolvedAgentCommand(), "opencode")
@@ -135,7 +135,7 @@ func TestCreateForm_DefaultsToOpencodeLauncher(t *testing.T) {
 }
 
 func TestCreateForm_LauncherSelectorTogglesBetweenOpencodeAndClaude(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -160,15 +160,16 @@ func TestCreateForm_LauncherSelectorTogglesBetweenOpencodeAndClaude(t *testing.T
 	}
 }
 
-func TestCreateForm_TabCyclesThreeFields(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
+func TestCreateForm_TabCyclesFourFields(t *testing.T) {
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
+	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
 	got := updated.(CreateFormModel)
 	if got.focusIndex.Value() != FieldNameSelectedIndex {
-		t.Fatalf("after 3 tabs (wrap): focus = %d, want %d (name)", got.focusIndex.Value(), FieldNameSelectedIndex)
+		t.Fatalf("after 4 tabs (wrap): focus = %d, want %d (name)", got.focusIndex.Value(), FieldNameSelectedIndex)
 	}
 }
 
@@ -182,7 +183,7 @@ func TestCreateForm_SubmitWithDefaultOpencodeSendsOpencodeCommand(t *testing.T) 
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t))
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("orphan"))
 	_, cmd := updated.(CreateFormModel).Update(formKeyPress("enter"))
@@ -206,7 +207,7 @@ func TestCreateForm_SubmitWithClaudeSendsClaudeCommand(t *testing.T) {
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
 		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
 		Return(nil).Once()
-	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t))
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t), testEditors(t))
 
 	updated, _ := form.Update(formKeyPress("orphan"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -224,12 +225,110 @@ func TestCreateForm_SubmitWithClaudeSendsClaudeCommand(t *testing.T) {
 }
 
 func TestCreateForm_ViewShowsLauncherOptions(t *testing.T) {
-	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t))
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
 
 	view := form.View().Content
 	for _, want := range []string{"OpenCode", "Claude Code"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("View() missing launcher display name %q: %q", want, view)
+		}
+	}
+}
+
+func TestCreateForm_DefaultsToVSCodeEditor(t *testing.T) {
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
+
+	if form.resolvedEditorCommand() != "code" {
+		t.Fatalf("default resolved editor command = %q, want %q", form.resolvedEditorCommand(), "code")
+	}
+}
+
+func TestCreateForm_EditorSelectorTogglesBetweenEntries(t *testing.T) {
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
+
+	updated, _ := form.Update(formKeyPress("tab"))
+	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
+	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
+	got := updated.(CreateFormModel)
+	if got.focusIndex.Value() != FieldEditorSelectedIndex {
+		t.Fatalf("after 3 tabs: focus = %d, want %d (editor)", got.focusIndex.Value(), FieldEditorSelectedIndex)
+	}
+	if got.resolvedEditorCommand() != "code" {
+		t.Fatalf("initial editor = %q, want %q", got.resolvedEditorCommand(), "code")
+	}
+
+	updated, _ = got.Update(formKeyPress("right"))
+	got = updated.(CreateFormModel)
+	if got.resolvedEditorCommand() != "cursor" {
+		t.Fatalf("after right: editor = %q, want %q", got.resolvedEditorCommand(), "cursor")
+	}
+
+	updated, _ = got.Update(formKeyPress("right"))
+	got = updated.(CreateFormModel)
+	if got.resolvedEditorCommand() != "code" {
+		t.Fatalf("after 2 rights (wrap): editor = %q, want %q", got.resolvedEditorCommand(), "code")
+	}
+}
+
+func TestCreateForm_SubmitWithDefaultEditorSendsCodeCommand(t *testing.T) {
+	t.Setenv("HOME", "/tmp/overseer-home")
+	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").Return("tmux-orphan-agent", nil).Once()
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t), testEditors(t))
+
+	updated, _ := form.Update(formKeyPress("orphan"))
+	_, cmd := updated.(CreateFormModel).Update(formKeyPress("enter"))
+
+	if cmd == nil {
+		t.Fatalf("submit command = nil")
+	}
+	cmd()
+	if savedSession.EditorCommand != "code" {
+		t.Fatalf("savedSession.EditorCommand = %q, want %q", savedSession.EditorCommand, "code")
+	}
+}
+
+func TestCreateForm_SubmitWithCursorEditorSendsCursorCommand(t *testing.T) {
+	t.Setenv("HOME", "/tmp/overseer-home")
+	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), "/tmp/overseer-home", "").Return("tmux-orphan", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), "/tmp/overseer-home", "opencode").Return("tmux-orphan-agent", nil).Once()
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+	form := NewCreateForm(styles.New(), svc, nil, testLaunchers(t), testEditors(t))
+
+	updated, _ := form.Update(formKeyPress("orphan"))
+	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
+	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
+	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
+	updated, _ = updated.(CreateFormModel).Update(formKeyPress("right"))
+	_, cmd := updated.(CreateFormModel).Update(formKeyPress("enter"))
+
+	if cmd == nil {
+		t.Fatalf("submit command = nil")
+	}
+	cmd()
+	if savedSession.EditorCommand != "cursor" {
+		t.Fatalf("savedSession.EditorCommand = %q, want %q", savedSession.EditorCommand, "cursor")
+	}
+}
+
+func TestCreateForm_ViewShowsEditorOptions(t *testing.T) {
+	form := NewCreateForm(styles.New(), newCreateFormSessionService(t), nil, testLaunchers(t), testEditors(t))
+
+	view := form.View().Content
+	for _, want := range []string{"VSCode", "Cursor"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("View() missing editor display name %q: %q", want, view)
 		}
 	}
 }
@@ -247,7 +346,8 @@ func newCreateFormSessionServiceWithMocks(t *testing.T) (service.SessionService,
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
 	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode")
-	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, slog.Default()), repo, projects, tmux, git
+	defaultEditor, _ := domain.NewEditor("VSCode", "code")
+	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, defaultEditor, slog.Default()), repo, projects, tmux, git
 }
 
 func testLaunchers(t *testing.T) []domain.Launcher {
@@ -261,6 +361,19 @@ func testLaunchers(t *testing.T) []domain.Launcher {
 		t.Fatalf("NewLauncher Claude Code: %v", err)
 	}
 	return []domain.Launcher{opencode, claude}
+}
+
+func testEditors(t *testing.T) []domain.Editor {
+	t.Helper()
+	vscode, err := domain.NewEditor("VSCode", "code")
+	if err != nil {
+		t.Fatalf("NewEditor VSCode: %v", err)
+	}
+	cursor, err := domain.NewEditor("Cursor", "cursor")
+	if err != nil {
+		t.Fatalf("NewEditor Cursor: %v", err)
+	}
+	return []domain.Editor{vscode, cursor}
 }
 
 func formKeyPress(value string) tea.KeyPressMsg {

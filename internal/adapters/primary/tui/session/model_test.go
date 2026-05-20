@@ -409,7 +409,8 @@ func newSessionServiceWithRepo(t *testing.T) (service.SessionService, *mocks.Moc
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
 	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode")
-	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, slog.Default()), repo
+	defaultEditor, _ := domain.NewEditor("VSCode", "code")
+	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, defaultEditor, slog.Default()), repo
 }
 
 func keyPress(value string) tea.KeyPressMsg {

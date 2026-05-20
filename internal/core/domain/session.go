@@ -26,6 +26,7 @@ type Session struct {
 	BaseBranch    string
 	FeatureBranch string
 	AgentCommand  string
+	EditorCommand string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -138,6 +139,21 @@ func (s *Session) AssignAgentCommand(cmd string) error {
 	return nil
 }
 
+// AssignEditorCommand sets the raw shell command used to open this
+// session's worktree in an editor (e.g. "code", "cursor --wait", "nvim").
+// The command must be non-empty after trimming; empty values are rejected
+// so the invariant "if EditorCommand is set, it is runnable" holds.
+func (s *Session) AssignEditorCommand(cmd string) error {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return ErrSessionEmptyEditorCommand
+	}
+
+	s.EditorCommand = cmd
+	s.UpdatedAt = time.Now()
+	return nil
+}
+
 // Session ports.
 
 type SessionRepository interface {
@@ -167,6 +183,8 @@ var (
 	ErrSessionWorktreeFieldsMismatch  = errors.New("session worktree fields must all be set")
 	ErrSessionWorktreePathNotAbsolute = errors.New("session worktree path must be absolute")
 	ErrSessionWorktreePathOutsideRoot = errors.New("session worktree path is outside the managed worktree root")
-	ErrSessionEmptyAgentCommand       = errors.New("session agent command cannot be empty")
-	ErrSessionNoAgentCommandAvailable = errors.New("session has no agent command and no default launcher is configured")
+	ErrSessionEmptyAgentCommand        = errors.New("session agent command cannot be empty")
+	ErrSessionNoAgentCommandAvailable  = errors.New("session has no agent command and no default launcher is configured")
+	ErrSessionEmptyEditorCommand       = errors.New("session editor command cannot be empty")
+	ErrSessionNoEditorCommandAvailable = errors.New("session has no editor command and no default editor is configured")
 )
