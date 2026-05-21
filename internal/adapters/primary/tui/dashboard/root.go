@@ -31,6 +31,7 @@ type popupKind int
 const (
 	popupNone popupKind = iota
 	popupNewSession
+	popupCheckoutBranch
 	popupDeleteSession
 )
 
@@ -40,6 +41,7 @@ type Model struct {
 	inspector      inspector.Model
 	helpBar        shared.HelpBarModel
 	createForm     sessionui.CreateFormModel
+	checkoutBranchForm sessionui.CheckoutBranchFormModel
 	deleteForm     sessionui.DeleteFormModel
 	scheduler      jobs.Model
 	activePopup    popupKind
@@ -132,6 +134,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
 		return m, cmd
+	case shared.SessionCheckedOutMsg:
+		m.activePopup = popupNone
+		var cmd tea.Cmd
+		m.leftPane, cmd = shared.UpdateModel(m.leftPane, shared.SessionCreatedMsg{Session: msg.Session})
+		return m, cmd
 	case shared.SessionDeleteRequestedMsg:
 		m.deleteForm = sessionui.NewDeleteForm(m.styles, m.sessionsService, msg.Session)
 		m.activePopup = popupDeleteSession
@@ -141,7 +148,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
 		return m, cmd
-	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg:
+	case shared.NewSessionPopupCloseMsg, shared.CheckoutBranchPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg:
 		m.activePopup = popupNone
 		return m, nil
 	case shared.SessionAttachReadyMsg:
@@ -213,6 +220,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors)
 			m.activePopup = popupNewSession
 			return m.createForm.Init(), true
+		}
+		if key.Matches(msg, checkoutBranchKeyBinding) {
+			m.checkoutBranchForm = sessionui.NewCheckoutBranchForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors)
+			m.activePopup = popupCheckoutBranch
+			return m.checkoutBranchForm.Init(), true
 		}
 		if key.Matches(msg, attachShellKeyBinding) {
 			if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
@@ -301,6 +313,10 @@ func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.createForm, cmd = shared.UpdateModel(m.createForm, msg)
 		return m, cmd
+	case popupCheckoutBranch:
+		var cmd tea.Cmd
+		m.checkoutBranchForm, cmd = shared.UpdateModel(m.checkoutBranchForm, msg)
+		return m, cmd
 	case popupDeleteSession:
 		var cmd tea.Cmd
 		m.deleteForm, cmd = shared.UpdateModel(m.deleteForm, msg)
@@ -347,6 +363,8 @@ func (m Model) popupView() string {
 	switch m.activePopup {
 	case popupNewSession:
 		return m.createForm.View().Content
+	case popupCheckoutBranch:
+		return m.checkoutBranchForm.View().Content
 	case popupDeleteSession:
 		return m.deleteForm.View().Content
 	}

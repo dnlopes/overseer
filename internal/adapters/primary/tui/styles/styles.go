@@ -56,6 +56,10 @@ type FormFieldStyles struct {
 type FormStyles struct {
 	Field     FormFieldStyles
 	Container lipgloss.Style
+	// Title is the heading rendered at the top of each modal form body
+	// (e.g. "New Session", "Open Branch"). Forms compose the title above
+	// the field stack so users can tell the popups apart at a glance.
+	Title lipgloss.Style
 	// Input holds the bubbles textinput.Styles shared by every form field
 	// (placeholder appearance, focused/blurred prompt color, cursor blink).
 	// Configured once at theme load — see [New].
@@ -217,6 +221,7 @@ func New() *Styles {
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(theme.BorderFocus).
 				Padding(1, 2),
+			Title: lipgloss.NewStyle().Foreground(theme.Primary).Bold(true).MarginBottom(1),
 			Field: FormFieldStyles{
 				Label:        lipgloss.NewStyle().Foreground(theme.Subtext),
 				LabelFocused: lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),

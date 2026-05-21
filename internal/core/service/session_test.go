@@ -1587,3 +1587,99 @@ func TestSessionService_OpenEditor_SessionNotFound(t *testing.T) {
 		t.Fatalf("OpenEditor() error = %v, want ErrSessionNotFound", err)
 	}
 }
+
+func TestSessionService_CheckoutBranch_HappyPath(t *testing.T) {
+	overseerID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+
+	repoPath := expectProjectLookup(t, projects, overseerID, "overseer")
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	git.EXPECT().CreateTrackingWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-main", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-main-agent", nil).Once()
+
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.CheckoutBranch(context.Background(), CheckoutBranchRequest{Name: "main", ProjectID: overseerID, Branch: "main"})
+
+	if err != nil {
+		t.Fatalf("CheckoutBranch() error = %v", err)
+	}
+	if resp.Session.Kind != domain.SessionKindCheckout {
+		t.Fatalf("CheckoutBranch() Session.Kind = %q, want %q", resp.Session.Kind, domain.SessionKindCheckout)
+	}
+	if !resp.Session.IsCheckout() {
+		t.Fatal("CheckoutBranch() Session.IsCheckout() = false, want true")
+	}
+	if resp.Session.BaseBranch != "main" {
+		t.Fatalf("CheckoutBranch() Session.BaseBranch = %q, want %q", resp.Session.BaseBranch, "main")
+	}
+	wantBranch := paths.SessionTrackingBranch(resp.Session.ID)
+	if resp.Session.FeatureBranch != wantBranch {
+		t.Fatalf("CheckoutBranch() Session.FeatureBranch = %q, want %q", resp.Session.FeatureBranch, wantBranch)
+	}
+	if savedSession.Kind != domain.SessionKindCheckout {
+		t.Fatalf("SessionRepository.Save Kind = %q, want %q", savedSession.Kind, domain.SessionKindCheckout)
+	}
+	if resp.Session.Order != 1 {
+		t.Fatalf("CheckoutBranch() Session.Order = %d, want 1", resp.Session.Order)
+	}
+}
+
+func TestSessionService_CheckoutBranch_EmptyBranch(t *testing.T) {
+	repo, projects, tmux, git := newSessionMocks(t)
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+
+	_, err := svc.CheckoutBranch(context.Background(), CheckoutBranchRequest{Name: "main", ProjectID: uuid.New()})
+
+	if !errors.Is(err, domain.ErrSessionEmptyBaseBranch) {
+		t.Fatalf("CheckoutBranch() error = %v, want %v", err, domain.ErrSessionEmptyBaseBranch)
+	}
+}
+
+func TestSessionService_CheckoutBranch_CreatesAgentTmuxSessionWithRequestedLauncher(t *testing.T) {
+	overseerID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+
+	repoPath := expectProjectLookup(t, projects, overseerID, "overseer")
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	git.EXPECT().CreateTrackingWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-main", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "claude").Return("tmux-main-agent", nil).Once()
+
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.CheckoutBranch(context.Background(), CheckoutBranchRequest{Name: "main", ProjectID: overseerID, Branch: "main", AgentCommand: "claude"})
+	if err != nil {
+		t.Fatalf("CheckoutBranch() error = %v", err)
+	}
+	if savedSession.AgentCommand != "claude" {
+		t.Fatalf("SessionRepository.Save AgentCommand = %q, want %q", savedSession.AgentCommand, "claude")
+	}
+}
+
+func TestSessionService_CheckoutBranch_DuplicateNameWithinSameProject(t *testing.T) {
+	overseerID := uuid.New()
+	existing := testutil.MakeSession("main", overseerID)
+	repo, projects, tmux, git := newSessionMocks(t)
+
+	expectProjectLookup(t, projects, overseerID, "overseer")
+	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.CheckoutBranch(context.Background(), CheckoutBranchRequest{Name: "main", ProjectID: overseerID, Branch: "main"})
+
+	if !errors.Is(err, domain.ErrSessionAlreadyExists) {
+		t.Fatalf("CheckoutBranch() error = %v, want %v", err, domain.ErrSessionAlreadyExists)
+	}
+}

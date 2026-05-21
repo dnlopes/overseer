@@ -62,6 +62,54 @@ func TestNewSession_RejectsZeroProjectID(t *testing.T) {
 	}
 }
 
+func TestNewSession_DefaultsToFeatureKind(t *testing.T) {
+	s, err := NewSession("alpha", uuid.New())
+	if err != nil {
+		t.Fatalf("NewSession() error = %v", err)
+	}
+	if s.Kind != SessionKindFeature {
+		t.Fatalf("NewSession() Kind = %q, want %q", s.Kind, SessionKindFeature)
+	}
+	if s.IsCheckout() {
+		t.Fatal("NewSession() IsCheckout() = true, want false")
+	}
+}
+
+func TestNewCheckoutSession_SetsCheckoutKind(t *testing.T) {
+	s, err := NewCheckoutSession("main", uuid.New())
+	if err != nil {
+		t.Fatalf("NewCheckoutSession() error = %v", err)
+	}
+	if s.Kind != SessionKindCheckout {
+		t.Fatalf("NewCheckoutSession() Kind = %q, want %q", s.Kind, SessionKindCheckout)
+	}
+	if !s.IsCheckout() {
+		t.Fatal("NewCheckoutSession() IsCheckout() = false, want true")
+	}
+}
+
+func TestNewCheckoutSession_AppliesSameValidationAsNewSession(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		projectID uuid.UUID
+		wantErr   error
+	}{
+		{name: "empty name", input: "", projectID: uuid.New(), wantErr: ErrSessionEmptyName},
+		{name: "blank name", input: "   ", projectID: uuid.New(), wantErr: ErrSessionEmptyName},
+		{name: "name too long", input: strings.Repeat("a", 101), projectID: uuid.New(), wantErr: ErrSessionNameTooLong},
+		{name: "nil project id", input: "main", projectID: uuid.Nil, wantErr: ErrSessionEmptyProjectID},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewCheckoutSession(tt.input, tt.projectID)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("NewCheckoutSession() error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestNewSession_Validation(t *testing.T) {
 	long := strings.Repeat("a", 101)
 	tests := []struct {

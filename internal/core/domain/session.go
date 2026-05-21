@@ -10,17 +10,43 @@ import (
 	"github.com/google/uuid"
 )
 
+// SessionKind discriminates how a session relates to its branch:
+//
+//   - SessionKindFeature (the default, also the JSON zero value) is a regular
+//     feature session: FeatureBranch is a NEW branch forked from BaseBranch
+//     and the user is expected to push it / open a PR.
+//   - SessionKindCheckout is a check / draft session created by checking out
+//     an existing branch: FeatureBranch is a local branch whose upstream is
+//     set to origin/<BaseBranch>, so the user can `git pull` to follow the
+//     tracked branch and commit local drafts without disturbing it.
+//
+// Persisted as a string so the data file stays human-readable; the empty
+// string deserialises to SessionKindFeature for backward compatibility with
+// records created before this discriminator existed. The storage layer
+// translates the legacy value "open-branch" to "checkout" when loading.
+type SessionKind string
+
+const (
+	SessionKindFeature  SessionKind = ""
+	SessionKindCheckout SessionKind = "checkout"
+)
+
 // Session is the aggregate representing a single AI agent session.
 //
 // Every session is bound to a Project (its git repository) — ProjectID is
-// required and rejected when uuid.Nil. The session's worktree is forked from
-// BaseBranch inside the project's repo, on a new branch FeatureBranch, at
-// WorktreePath. These three fields are populated together via AssignWorktree
-// before the session is persisted.
+// required and rejected when uuid.Nil. The session's worktree lives at
+// WorktreePath; BaseBranch and FeatureBranch are populated together with
+// WorktreePath via AssignWorktree before the session is persisted.
+//
+// The Kind field discriminates between feature sessions (FeatureBranch is a
+// brand-new branch forked from BaseBranch) and checkout sessions
+// (FeatureBranch is a local branch tracking origin/<BaseBranch>). The
+// worktree layout itself is identical in both cases.
 type Session struct {
 	ID            uuid.UUID
 	Name          string
 	ProjectID     uuid.UUID
+	Kind          SessionKind `json:",omitempty"`
 	Order         int
 	WorktreePath  string
 	BaseBranch    string
@@ -31,10 +57,23 @@ type Session struct {
 	UpdatedAt     time.Time
 }
 
-// NewSession constructs a Session with no worktree assigned. Callers must
-// follow up with AssignWorktree before persisting; ProjectID is required and
-// uuid.Nil is rejected.
+// NewSession constructs a feature Session with no worktree assigned. Callers
+// must follow up with AssignWorktree before persisting; ProjectID is
+// required and uuid.Nil is rejected.
 func NewSession(name string, projectID uuid.UUID) (Session, error) {
+	return newSession(name, projectID, SessionKindFeature)
+}
+
+// NewCheckoutSession constructs a checkout Session with no worktree
+// assigned. Checkout sessions exist to inspect or draft on top of an
+// existing branch (typically the default branch). Callers must follow up
+// with AssignWorktree before persisting; ProjectID is required and uuid.Nil
+// is rejected.
+func NewCheckoutSession(name string, projectID uuid.UUID) (Session, error) {
+	return newSession(name, projectID, SessionKindCheckout)
+}
+
+func newSession(name string, projectID uuid.UUID, kind SessionKind) (Session, error) {
 	name = strings.TrimSpace(name)
 
 	if name == "" {
@@ -52,10 +91,16 @@ func NewSession(name string, projectID uuid.UUID) (Session, error) {
 		ID:        uuid.New(),
 		Name:      name,
 		ProjectID: projectID,
+		Kind:      kind,
 		Order:     0,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
+}
+
+// IsCheckout reports whether this is a checkout (tracking) session.
+func (s Session) IsCheckout() bool {
+	return s.Kind == SessionKindCheckout
 }
 
 // HasWorktree reports whether the session has a worktree assigned.
@@ -108,7 +153,8 @@ func (s *Session) Rename(newName string) error {
 // AssignWorktree populates the worktree ensemble (path + base branch +
 // feature branch). All three must be non-empty and the path must be
 // absolute; partial assignment is rejected to preserve the all-or-none
-// invariant.
+// invariant. The same call shape is used for both feature and checkout
+// sessions — the discriminator lives in Session.Kind, not in this method.
 func (s *Session) AssignWorktree(worktreePath, baseBranch, featureBranch string) error {
 	worktreePath = strings.TrimSpace(worktreePath)
 	baseBranch = strings.TrimSpace(baseBranch)
@@ -171,6 +217,12 @@ type GitAdapter interface {
 	// CreateWorktree creates a new git worktree at worktreePath, forked from
 	// baseBranch inside repoPath, on a new branch named featureBranch.
 	CreateWorktree(ctx context.Context, repoPath, baseBranch, featureBranch, worktreePath string) error
+	// CreateTrackingWorktree creates a new git worktree at worktreePath whose
+	// local branch (localBranch) tracks origin/<remoteBranch>. Used for
+	// checkout sessions so a plain `git pull` follows the upstream branch
+	// while still letting the user commit local drafts that never collide
+	// with the tracked branch checked out elsewhere.
+	CreateTrackingWorktree(ctx context.Context, repoPath, remoteBranch, localBranch, worktreePath string) error
 	// RemoveWorktree removes the worktree at worktreePath from the repository
 	// rooted at repoPath. Implementations may force-remove uncommitted changes.
 	RemoveWorktree(ctx context.Context, repoPath, worktreePath string) error

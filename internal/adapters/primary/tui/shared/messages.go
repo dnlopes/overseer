@@ -30,6 +30,12 @@ type NewSessionPopupCloseMsg struct{}
 
 type SessionCreateErrMsg struct{ Err error }
 
+type SessionCheckedOutMsg struct{ Session domain.Session }
+
+type SessionCheckoutErrMsg struct{ Err error }
+
+type CheckoutBranchPopupCloseMsg struct{}
+
 type SessionAttachReadyMsg struct {
 	Command *exec.Cmd
 	Err     error

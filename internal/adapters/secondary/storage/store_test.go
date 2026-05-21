@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -436,5 +437,47 @@ func TestStore_PersistsBothAggregatesInSameFile(t *testing.T) {
 	}
 	if gotSession.ProjectID != project.ID {
 		t.Errorf("Session ProjectID = %v after reload, want %v", gotSession.ProjectID, project.ID)
+	}
+}
+
+func TestStore_LegacyOpenBranchKindMigratesToCheckoutOnLoad(t *testing.T) {
+	dir := t.TempDir()
+	dataPath := filepath.Join(dir, "data.json")
+	legacy := `{
+  "projects": [],
+  "sessions": [
+    {
+      "ID": "00000000-0000-0000-0000-00000000abcd",
+      "Name": "main",
+      "ProjectID": "00000000-0000-0000-0000-00000000beef",
+      "Kind": "open-branch",
+      "Order": 1,
+      "WorktreePath": "/tmp/wt/abcd",
+      "BaseBranch": "main",
+      "FeatureBranch": "overseer/check/abcd",
+      "AgentCommand": "",
+      "EditorCommand": "",
+      "CreatedAt": "2025-01-01T00:00:00Z",
+      "UpdatedAt": "2025-01-01T00:00:00Z"
+    }
+  ]
+}`
+	if err := os.WriteFile(dataPath, []byte(legacy), 0o644); err != nil {
+		t.Fatalf("seed legacy file: %v", err)
+	}
+
+	store, err := storage.New(dataPath, discardLogger())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	sess, err := store.Sessions().Get(context.Background(), uuid.MustParse("00000000-0000-0000-0000-00000000abcd"))
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if sess.Kind != domain.SessionKindCheckout {
+		t.Fatalf("legacy Kind not migrated: got %q, want %q", sess.Kind, domain.SessionKindCheckout)
+	}
+	if !sess.IsCheckout() {
+		t.Fatal("legacy session should report IsCheckout() == true after migration")
 	}
 }

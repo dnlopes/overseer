@@ -100,30 +100,31 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 		return CreateSessionResponse{}, fmt.Errorf("assign worktree: %w", err)
 	}
 
-	existing, err := s.repo.List(ctx)
+	nextOrder, err := s.assignNextOrderForProject(ctx, sess)
 	if err != nil {
-		return CreateSessionResponse{}, fmt.Errorf("list sessions: %w", err)
-	}
-
-	nextOrder := 1
-	for _, candidate := range existing {
-		if candidate.ProjectID != sess.ProjectID {
-			continue
-		}
-		if candidate.Name == sess.Name {
-			return CreateSessionResponse{}, domain.ErrSessionAlreadyExists
-		}
-		if candidate.Order >= nextOrder {
-			nextOrder = candidate.Order + 1
-		}
+		return CreateSessionResponse{}, err
 	}
 	sess.Order = nextOrder
 
 	if err := s.git.CreateWorktree(ctx, project.Path, sess.BaseBranch, sess.FeatureBranch, sess.WorktreePath); err != nil {
 		return CreateSessionResponse{}, fmt.Errorf("create git worktree: %w", err)
 	}
+
+	sess, err = s.spinUpTmuxAndPersist(ctx, sess, project)
+	if err != nil {
+		return CreateSessionResponse{}, err
+	}
+	return CreateSessionResponse{Session: sess}, nil
+}
+
+// spinUpTmuxAndPersist runs the post-git tail shared by Create and CheckoutBranch:
+// it creates the shell + agent tmux sessions, saves the session row, and
+// bumps the project's UpdatedAt for recency ordering. The agent tmux session
+// uses sess.AgentCommand, falling back to the default launcher when empty —
+// matching the lazy launch semantics in ensureTmuxSession.
+func (s *SessionService) spinUpTmuxAndPersist(ctx context.Context, sess domain.Session, project domain.Project) (domain.Session, error) {
 	if _, err := s.tmux.CreateSession(ctx, sess.ID.String(), sess.WorktreePath, ""); err != nil {
-		return CreateSessionResponse{}, fmt.Errorf("create tmux session: %w", err)
+		return domain.Session{}, fmt.Errorf("create tmux session: %w", err)
 	}
 
 	agentCmd := sess.AgentCommand
@@ -132,11 +133,11 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 	}
 	if _, err := s.tmux.CreateSession(ctx, sess.ID.String()+"-agent", sess.WorktreePath, agentCmd); err != nil {
 		_ = s.tmux.KillSession(ctx, sess.ID.String())
-		return CreateSessionResponse{}, fmt.Errorf("create agent tmux session: %w", err)
+		return domain.Session{}, fmt.Errorf("create agent tmux session: %w", err)
 	}
 
 	if err := s.repo.Save(ctx, sess); err != nil {
-		return CreateSessionResponse{}, fmt.Errorf("save session: %w", err)
+		return domain.Session{}, fmt.Errorf("save session: %w", err)
 	}
 
 	project.UpdatedAt = sess.CreatedAt
@@ -147,7 +148,95 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 		)
 	}
 
-	return CreateSessionResponse{Session: sess}, nil
+	return sess, nil
+}
+
+// --- CheckoutBranch ---
+
+type CheckoutBranchRequest struct {
+	Name          string
+	ProjectID     uuid.UUID
+	Branch        string
+	AgentCommand  string
+	EditorCommand string
+}
+
+type CheckoutBranchResponse struct {
+	Session domain.Session
+}
+
+func (s *SessionService) CheckoutBranch(ctx context.Context, req CheckoutBranchRequest) (CheckoutBranchResponse, error) {
+	if req.Branch == "" {
+		return CheckoutBranchResponse{}, domain.ErrSessionEmptyBaseBranch
+	}
+
+	sess, err := domain.NewCheckoutSession(req.Name, req.ProjectID)
+	if err != nil {
+		return CheckoutBranchResponse{}, err
+	}
+
+	if req.AgentCommand != "" {
+		if err := sess.AssignAgentCommand(req.AgentCommand); err != nil {
+			return CheckoutBranchResponse{}, err
+		}
+	}
+
+	if req.EditorCommand != "" {
+		if err := sess.AssignEditorCommand(req.EditorCommand); err != nil {
+			return CheckoutBranchResponse{}, err
+		}
+	}
+
+	project, err := s.projects.Get(ctx, req.ProjectID)
+	if err != nil {
+		return CheckoutBranchResponse{}, fmt.Errorf("lookup project: %w", err)
+	}
+	if err := sess.AssignWorktree(
+		s.pathsResolver.SessionWorktreePath(sess.ID),
+		req.Branch,
+		paths.SessionTrackingBranch(sess.ID),
+	); err != nil {
+		return CheckoutBranchResponse{}, fmt.Errorf("assign worktree: %w", err)
+	}
+
+	nextOrder, err := s.assignNextOrderForProject(ctx, sess)
+	if err != nil {
+		return CheckoutBranchResponse{}, err
+	}
+	sess.Order = nextOrder
+
+	if err := s.git.CreateTrackingWorktree(ctx, project.Path, sess.BaseBranch, sess.FeatureBranch, sess.WorktreePath); err != nil {
+		return CheckoutBranchResponse{}, fmt.Errorf("create tracking worktree: %w", err)
+	}
+
+	sess, err = s.spinUpTmuxAndPersist(ctx, sess, project)
+	if err != nil {
+		return CheckoutBranchResponse{}, err
+	}
+	return CheckoutBranchResponse{Session: sess}, nil
+}
+
+// assignNextOrderForProject computes the next Order value for a session
+// inside its project, and returns ErrSessionAlreadyExists if a sibling
+// session shares the same name. Shared by Create and CheckoutBranch.
+func (s *SessionService) assignNextOrderForProject(ctx context.Context, sess domain.Session) (int, error) {
+	existing, err := s.repo.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("list sessions: %w", err)
+	}
+	nextOrder := 1
+	for _, candidate := range existing {
+		if candidate.ProjectID != sess.ProjectID {
+			continue
+		}
+		if candidate.Name == sess.Name {
+			return 0, domain.ErrSessionAlreadyExists
+		}
+		if candidate.Order >= nextOrder {
+			nextOrder = candidate.Order + 1
+		}
+	}
+	return nextOrder, nil
 }
 
 // --- Rename ---

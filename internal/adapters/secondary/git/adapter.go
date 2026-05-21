@@ -46,6 +46,39 @@ func (a *Adapter) CreateWorktree(_ context.Context, repoPath, baseBranch, featur
 	return nil
 }
 
+// CreateTrackingWorktree creates a worktree at worktreePath on a new local
+// branch (localBranch) that tracks origin/<remoteBranch>. When the origin
+// ref is missing (no remote configured, or branch not yet pushed) it falls
+// back to forking localBranch from the same local ref without an upstream,
+// matching what `git checkout -b` would do, so the worktree is still usable
+// for inspection / drafting even on offline or local-only repositories.
+func (a *Adapter) CreateTrackingWorktree(_ context.Context, repoPath, remoteBranch, localBranch, worktreePath string) error {
+	originRef := "origin/" + remoteBranch
+	if _, err := a.runIn(repoPath, "rev-parse", "--verify", "--quiet", "refs/remotes/"+originRef); err == nil {
+		if _, err := a.runIn(repoPath, "worktree", "add", "--track", "-b", localBranch, worktreePath, originRef); err != nil {
+			return fmt.Errorf("git: create tracking worktree %q: %w", worktreePath, err)
+		}
+		a.logger.Debug("git tracking worktree created",
+			"repo", repoPath,
+			"remote_branch", remoteBranch,
+			"local_branch", localBranch,
+			"worktree", worktreePath,
+		)
+		return nil
+	}
+
+	if _, err := a.runIn(repoPath, "worktree", "add", "-b", localBranch, worktreePath, remoteBranch); err != nil {
+		return fmt.Errorf("git: create tracking worktree (no origin) %q: %w", worktreePath, err)
+	}
+	a.logger.Debug("git worktree created without remote tracking",
+		"repo", repoPath,
+		"base_branch", remoteBranch,
+		"local_branch", localBranch,
+		"worktree", worktreePath,
+	)
+	return nil
+}
+
 // RemoveWorktree runs `git -C <repoPath> worktree remove --force
 // <worktreePath>`. The --force flag is used so worktrees with uncommitted
 // changes are not stranded.

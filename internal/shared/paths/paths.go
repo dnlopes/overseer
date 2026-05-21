@@ -49,11 +49,20 @@ func ConfigFile() string {
 	return filepath.Join(defaultConfigDir(), "config.yaml")
 }
 
-// SessionFeatureBranch is the convention-based git branch name for a
+// SessionFeatureBranch is the convention-based git branch name for a feature
 // session's worktree: "overseer/<session-id>". The session UUID guarantees
 // the branch name is unique within the repository.
 func SessionFeatureBranch(sessionID uuid.UUID) string {
 	return "overseer/" + sessionID.String()
+}
+
+// SessionTrackingBranch is the convention-based git branch name for a
+// checkout session's worktree: "overseer/check/<session-id>". It lives
+// in a sibling namespace to SessionFeatureBranch so a reader of `git
+// branch` can tell at a glance which sessions are feature work and which
+// are check / draft views.
+func SessionTrackingBranch(sessionID uuid.UUID) string {
+	return "overseer/check/" + sessionID.String()
 }
 
 func EnsureDir(dir string) error {

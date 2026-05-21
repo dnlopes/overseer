@@ -18,19 +18,19 @@ import (
 )
 
 const (
-	fieldName int = iota
-	fieldRepository
-	fieldBaseBranch
-	fieldLauncher
-	fieldEditor
+	checkoutFieldName int = iota
+	checkoutFieldRepository
+	checkoutFieldBranch
+	checkoutFieldLauncher
+	checkoutFieldEditor
 )
 
-const totalCreateFields = 5
+const totalCheckoutBranchFields = 5
 
-type CreateFormModel struct {
+type CheckoutBranchFormModel struct {
 	nameInput       textinput.Model
 	repoPicker      repoPicker
-	baseBranchInput textinput.Model
+	branchInput     textinput.Model
 	launchers       []domain.Launcher
 	launcherIdx     int
 	editors         []domain.Editor
@@ -42,58 +42,54 @@ type CreateFormModel struct {
 	styles          *styles.Styles
 }
 
-// NewCreateForm builds the session-create form. The supplied projects seed
-// the repo picker's "recent" list (ordered by UpdatedAt server-side).
-func NewCreateForm(
+func NewCheckoutBranchForm(
 	s *styles.Styles,
 	sessionsService service.SessionService,
 	projectsService service.ProjectService,
 	projects []domain.Project,
 	launchers []domain.Launcher,
 	editors []domain.Editor,
-) CreateFormModel {
+) CheckoutBranchFormModel {
 	nameInput := textinput.New()
-	nameInput.Placeholder = "Session name"
+	nameInput.Placeholder = "(defaults to branch)"
 	nameInput.CharLimit = 100
 	nameInput.SetWidth(36)
 	nameInput.SetStyles(s.Form.Input)
 	nameInput.Focus()
 
-	baseBranchInput := textinput.New()
-	baseBranchInput.Placeholder = "main"
-	baseBranchInput.CharLimit = 200
-	baseBranchInput.SetWidth(36)
-	baseBranchInput.SetStyles(s.Form.Input)
+	branchInput := textinput.New()
+	branchInput.Placeholder = "main"
+	branchInput.CharLimit = 200
+	branchInput.SetWidth(36)
+	branchInput.SetStyles(s.Form.Input)
 
-	return CreateFormModel{
+	return CheckoutBranchFormModel{
 		nameInput:       nameInput,
 		repoPicker:      newRepoPicker(s, projects),
-		baseBranchInput: baseBranchInput,
+		branchInput:     branchInput,
 		launchers:       launchers,
 		launcherIdx:     0,
 		editors:         editors,
 		editorIdx:       0,
-		focusIndex:      shared.NewCircularInt(0, totalCreateFields-1),
+		focusIndex:      shared.NewCircularInt(0, totalCheckoutBranchFields-1),
 		sessionsService: sessionsService,
 		projectsService: projectsService,
 		styles:          s,
 	}
 }
 
-func (m CreateFormModel) Init() tea.Cmd {
+func (m CheckoutBranchFormModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m CheckoutBranchFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		if key.Matches(msg, popupCloseKeyBinding) {
-			return m, shared.Emit(shared.NewSessionPopupCloseMsg{})
+			return m, shared.Emit(shared.CheckoutBranchPopupCloseMsg{})
 		}
 
-		// Enter in paste-mode confirms the pasted path (registers the project)
-		// rather than submitting the whole form.
-		if m.focusIndex.Value() == fieldRepository && m.repoPicker.isPasteMode() && key.Matches(msg, popupSubmitFormKeyBinding) {
+		if m.focusIndex.Value() == checkoutFieldRepository && m.repoPicker.isPasteMode() && key.Matches(msg, popupSubmitFormKeyBinding) {
 			return m.confirmPastedPath()
 		}
 
@@ -107,13 +103,13 @@ func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.moveFocus(-1)
 		}
 
-		if m.focusIndex.Value() == fieldRepository {
+		if m.focusIndex.Value() == checkoutFieldRepository {
 			var cmd tea.Cmd
 			m.repoPicker, cmd = m.repoPicker.update(msg)
 			return m, cmd
 		}
 
-		if m.focusIndex.Value() == fieldLauncher {
+		if m.focusIndex.Value() == checkoutFieldLauncher {
 			if key.Matches(msg, popupSelectorNextKeyBinding) {
 				m.cycleLauncher(1)
 				return m, nil
@@ -124,7 +120,7 @@ func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if m.focusIndex.Value() == fieldEditor {
+		if m.focusIndex.Value() == checkoutFieldEditor {
 			if key.Matches(msg, popupSelectorNextKeyBinding) {
 				m.cycleEditor(1)
 				return m, nil
@@ -135,12 +131,12 @@ func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-	case shared.SessionCreateErrMsg:
+	case shared.SessionCheckoutErrMsg:
 		m.errMsg = msg.Err.Error()
 		return m, nil
 
-	case shared.SessionCreatedMsg:
-		return m, shared.Emit(shared.NewSessionPopupCloseMsg{})
+	case shared.SessionCheckedOutMsg:
+		return m, shared.Emit(shared.CheckoutBranchPopupCloseMsg{})
 
 	case shared.ProjectRegisteredMsg:
 		m.repoPicker.adoptRegisteredProject(msg.Project)
@@ -151,23 +147,23 @@ func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = msg.Err.Error()
 		return m, nil
 
-	case defaultBranchDetectedMsg:
-		if msg.Err == nil && strings.TrimSpace(m.baseBranchInput.Value()) == "" {
-			m.baseBranchInput.SetValue(msg.Branch)
+	case checkoutBranchDefaultDetectedMsg:
+		if msg.Err == nil && strings.TrimSpace(m.branchInput.Value()) == "" {
+			m.branchInput.SetValue(msg.Branch)
 		}
 		return m, nil
 	}
 
 	switch m.focusIndex.Value() {
-	case fieldName:
+	case checkoutFieldName:
 		var cmd tea.Cmd
 		m.nameInput, cmd = m.nameInput.Update(msg)
 		return m, cmd
-	case fieldBaseBranch:
+	case checkoutFieldBranch:
 		var cmd tea.Cmd
-		m.baseBranchInput, cmd = m.baseBranchInput.Update(msg)
+		m.branchInput, cmd = m.branchInput.Update(msg)
 		return m, cmd
-	case fieldRepository:
+	case checkoutFieldRepository:
 		var cmd tea.Cmd
 		m.repoPicker, cmd = m.repoPicker.update(msg)
 		return m, cmd
@@ -176,26 +172,20 @@ func (m CreateFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// defaultBranchDetectedMsg carries the result of an async
-// ProjectService.DetectDefaultBranch call so the form can populate (or leave
-// empty) the base-branch field.
-type defaultBranchDetectedMsg struct {
+type checkoutBranchDefaultDetectedMsg struct {
 	Branch string
 	Err    error
 }
 
-func (m CreateFormModel) detectDefaultBranchCmd(projectID uuid.UUID) tea.Cmd {
+func (m CheckoutBranchFormModel) detectDefaultBranchCmd(projectID uuid.UUID) tea.Cmd {
 	svc := m.projectsService
 	return func() tea.Msg {
 		resp, err := svc.DetectDefaultBranch(context.Background(), service.DetectDefaultBranchRequest{ProjectID: projectID})
-		return defaultBranchDetectedMsg{Branch: resp.Branch, Err: err}
+		return checkoutBranchDefaultDetectedMsg{Branch: resp.Branch, Err: err}
 	}
 }
 
-// moveFocus shifts focus by direction (+1 next, -1 previous) and triggers a
-// default-branch auto-detect when the user enters an empty BaseBranch field
-// with a known project selected.
-func (m CreateFormModel) moveFocus(direction int) (tea.Model, tea.Cmd) {
+func (m CheckoutBranchFormModel) moveFocus(direction int) (tea.Model, tea.Cmd) {
 	if direction > 0 {
 		m.focusIndex.Increment()
 	} else {
@@ -203,7 +193,7 @@ func (m CreateFormModel) moveFocus(direction int) (tea.Model, tea.Cmd) {
 	}
 	m.updateFocusAndBlurs()
 
-	if m.focusIndex.Value() == fieldBaseBranch && strings.TrimSpace(m.baseBranchInput.Value()) == "" {
+	if m.focusIndex.Value() == checkoutFieldBranch && strings.TrimSpace(m.branchInput.Value()) == "" {
 		if proj := m.repoPicker.selectedProject(); proj != nil {
 			return m, m.detectDefaultBranchCmd(proj.ID)
 		}
@@ -211,22 +201,22 @@ func (m CreateFormModel) moveFocus(direction int) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *CreateFormModel) updateFocusAndBlurs() {
+func (m *CheckoutBranchFormModel) updateFocusAndBlurs() {
 	m.nameInput.Blur()
-	m.baseBranchInput.Blur()
+	m.branchInput.Blur()
 	m.repoPicker.blur()
 
 	switch m.focusIndex.Value() {
-	case fieldName:
+	case checkoutFieldName:
 		m.nameInput.Focus()
-	case fieldBaseBranch:
-		m.baseBranchInput.Focus()
-	case fieldRepository:
+	case checkoutFieldBranch:
+		m.branchInput.Focus()
+	case checkoutFieldRepository:
 		m.repoPicker.focus()
 	}
 }
 
-func (m *CreateFormModel) cycleLauncher(direction int) {
+func (m *CheckoutBranchFormModel) cycleLauncher(direction int) {
 	choices := len(m.launchers)
 	if choices == 0 {
 		return
@@ -234,7 +224,7 @@ func (m *CreateFormModel) cycleLauncher(direction int) {
 	m.launcherIdx = ((m.launcherIdx+direction)%choices + choices) % choices
 }
 
-func (m *CreateFormModel) cycleEditor(direction int) {
+func (m *CheckoutBranchFormModel) cycleEditor(direction int) {
 	choices := len(m.editors)
 	if choices == 0 {
 		return
@@ -242,24 +232,21 @@ func (m *CreateFormModel) cycleEditor(direction int) {
 	m.editorIdx = ((m.editorIdx+direction)%choices + choices) % choices
 }
 
-func (m CreateFormModel) resolvedAgentCommand() string {
+func (m CheckoutBranchFormModel) resolvedAgentCommand() string {
 	if len(m.launchers) == 0 {
 		return ""
 	}
 	return m.launchers[m.launcherIdx].Command
 }
 
-func (m CreateFormModel) resolvedEditorCommand() string {
+func (m CheckoutBranchFormModel) resolvedEditorCommand() string {
 	if len(m.editors) == 0 {
 		return ""
 	}
 	return m.editors[m.editorIdx].Command
 }
 
-// confirmPastedPath fires a Register cmd for the path the user just typed in
-// paste mode. The picker stays in paste mode until ProjectRegisteredMsg
-// arrives; on error the form surfaces the message and the user can edit.
-func (m CreateFormModel) confirmPastedPath() (tea.Model, tea.Cmd) {
+func (m CheckoutBranchFormModel) confirmPastedPath() (tea.Model, tea.Cmd) {
 	path := m.repoPicker.pastedPath()
 	if path == "" {
 		m.errMsg = "repository path is required"
@@ -276,75 +263,71 @@ func (m CreateFormModel) confirmPastedPath() (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m CreateFormModel) submit() (tea.Model, tea.Cmd) {
-	name := strings.TrimSpace(m.nameInput.Value())
-	if name == "" {
-		m.errMsg = "session name is required"
-		return m, nil
-	}
-
+func (m CheckoutBranchFormModel) submit() (tea.Model, tea.Cmd) {
 	selection := m.repoPicker.resolve()
 	if selection.IsZero() {
 		m.errMsg = "select a repository"
 		return m, nil
 	}
 	if selection.Project == nil {
-		// User pasted a path but didn't confirm with Enter — refuse to silently
-		// register on submit; force an explicit confirm so the user sees errors
-		// inline before the whole submission attempt.
 		m.errMsg = "press enter to confirm the pasted path"
 		return m, nil
 	}
 
-	baseBranch := strings.TrimSpace(m.baseBranchInput.Value())
-	if baseBranch == "" {
-		m.errMsg = "base branch is required"
+	branch := strings.TrimSpace(m.branchInput.Value())
+	if branch == "" {
+		m.errMsg = "branch is required"
 		return m, nil
 	}
 
+	name := strings.TrimSpace(m.nameInput.Value())
+	if name == "" {
+		name = branch
+	}
+
 	m.errMsg = ""
-	req := service.CreateSessionRequest{
+	req := service.CheckoutBranchRequest{
 		Name:          name,
 		ProjectID:     selection.Project.ID,
-		BaseBranch:    baseBranch,
+		Branch:        branch,
 		AgentCommand:  m.resolvedAgentCommand(),
 		EditorCommand: m.resolvedEditorCommand(),
 	}
 	svc := m.sessionsService
 	return m, func() tea.Msg {
-		resp, err := svc.Create(context.Background(), req)
+		resp, err := svc.CheckoutBranch(context.Background(), req)
 		if err != nil {
-			return shared.SessionCreateErrMsg{Err: err}
+			return shared.SessionCheckoutErrMsg{Err: err}
 		}
-		return shared.SessionCreatedMsg{Session: resp.Session}
+		return shared.SessionCheckedOutMsg{Session: resp.Session}
 	}
 }
 
-func (m CreateFormModel) View() tea.View {
+func (m CheckoutBranchFormModel) View() tea.View {
 	s := m.styles.Form.Field
 
 	var b strings.Builder
-	b.WriteString(m.styles.Form.Title.Render("New Session"))
+	b.WriteString(m.styles.Form.Title.Render("Checkout Branch"))
 	b.WriteByte('\n')
-	b.WriteString(m.labelStyle(fieldName).Render("Name"))
+	b.WriteString(m.labelStyle(checkoutFieldName).Render("Name"))
 	b.WriteByte('\n')
 	b.WriteString(m.nameInput.View())
 	b.WriteByte('\n')
-	b.WriteString(m.labelStyle(fieldRepository).Render("Repository"))
+	b.WriteString(m.labelStyle(checkoutFieldRepository).Render("Repository"))
 	b.WriteByte('\n')
 	b.WriteString(m.repoPicker.view())
 	b.WriteByte('\n')
 	b.WriteString(m.styles.Help.Description.Render(m.repoPickerHint()))
 	b.WriteByte('\n')
-	b.WriteString(m.labelStyle(fieldBaseBranch).Render("Base branch"))
+	b.WriteString(m.labelStyle(checkoutFieldBranch).Render("Branch"))
 	b.WriteByte('\n')
-	b.WriteString(m.baseBranchInput.View())
+	b.WriteString(m.branchInput.View())
 	b.WriteByte('\n')
-	b.WriteString(m.labelStyle(fieldLauncher).Render("Launcher"))
+	b.WriteString(m.labelStyle(checkoutFieldLauncher).Render("Launcher"))
 	b.WriteByte('\n')
 	b.WriteString(m.launcherSelectorView())
 	b.WriteByte('\n')
-	b.WriteString(m.labelStyle(fieldEditor).Render("Editor"))
+	b.WriteString(m.labelStyle(checkoutFieldEditor).Render("Editor"))
 	b.WriteByte('\n')
 	b.WriteString(m.editorSelectorView())
 	b.WriteByte('\n')
@@ -353,18 +336,18 @@ func (m CreateFormModel) View() tea.View {
 		b.WriteByte('\n')
 	}
 	b.WriteByte('\n')
-	b.WriteString(m.styles.Help.Description.Render("Tab: next field  Enter: submit  Esc: cancel"))
+	b.WriteString(m.styles.Help.Description.Render("Tab: next field  Enter: checkout  Esc: cancel"))
 	return tea.NewView(components.Modal(m.styles, b.String(), 0, 0))
 }
 
-func (m CreateFormModel) labelStyle(field int) lipgloss.Style {
+func (m CheckoutBranchFormModel) labelStyle(field int) lipgloss.Style {
 	if m.focusIndex.Value() == field {
 		return m.styles.Form.Field.LabelFocused
 	}
 	return m.styles.Form.Field.Label
 }
 
-func (m CreateFormModel) launcherSelectorView() string {
+func (m CheckoutBranchFormModel) launcherSelectorView() string {
 	if len(m.launchers) == 0 {
 		return m.styles.ListRow.Normal.Render("  (no launchers configured)  ")
 	}
@@ -379,7 +362,7 @@ func (m CreateFormModel) launcherSelectorView() string {
 	return strings.Join(parts, " ")
 }
 
-func (m CreateFormModel) editorSelectorView() string {
+func (m CheckoutBranchFormModel) editorSelectorView() string {
 	if len(m.editors) == 0 {
 		return m.styles.ListRow.Normal.Render("  (no editors configured)  ")
 	}
@@ -394,22 +377,9 @@ func (m CreateFormModel) editorSelectorView() string {
 	return strings.Join(parts, " ")
 }
 
-func (m CreateFormModel) repoPickerHint() string {
+func (m CheckoutBranchFormModel) repoPickerHint() string {
 	if m.repoPicker.isPasteMode() {
 		return "Enter: confirm path  Ctrl+L: back to list"
 	}
-	return "←/→: cycle repos  Ctrl+P: paste new path"
-}
-
-func (m CreateFormModel) KeyBindings() []key.Binding {
-	return []key.Binding{
-		popupNextFieldKeyBinding,
-		popupPrevFieldKeyBinding,
-		popupSelectorNextKeyBinding,
-		popupSelectorPrevKeyBinding,
-		repoPickerEnterPasteKeyBinding,
-		repoPickerExitPasteKeyBinding,
-		popupSubmitFormKeyBinding,
-		popupCloseKeyBinding,
-	}
+	return "↑/↓: cycle repos  Ctrl+P: paste a new path"
 }

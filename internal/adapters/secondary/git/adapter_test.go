@@ -211,3 +211,106 @@ func TestAdapter_GetDefaultBranchReturnsSentinelWhenNothingResolves(t *testing.T
 		t.Fatalf("GetDefaultBranch() error = %v, want wrapped %v", err, domain.ErrProjectNoDefaultBranch)
 	}
 }
+
+// seedRepoWithRemote builds a local repo whose "origin" remote is a bare
+// repository on disk, with main already pushed to origin so
+// refs/remotes/origin/main exists locally — the precondition exercised by
+// CreateTrackingWorktree's `--track` path.
+func seedRepoWithRemote(t *testing.T) string {
+	t.Helper()
+	upstream := t.TempDir()
+	if out, err := exec.Command("git", "init", "--bare", "-q", "-b", "main", upstream).CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare: %v\n%s", err, out)
+	}
+	repo := t.TempDir()
+	cmds := [][]string{
+		{"init", "-q", "-b", "main"},
+		{"config", "user.email", "test@overseer.local"},
+		{"config", "user.name", "Overseer Test"},
+		{"commit", "--allow-empty", "-q", "-m", "init"},
+		{"remote", "add", "origin", upstream},
+		{"push", "-q", "origin", "main"},
+		{"fetch", "-q", "origin"},
+	}
+	for _, args := range cmds {
+		full := append([]string{"-C", repo}, args...)
+		if out, err := exec.Command("git", full...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	return repo
+}
+
+func TestAdapter_CreateTrackingWorktree_SetsUpstreamWhenOriginExists(t *testing.T) {
+	a, err := git.New(discardLogger())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	repo := seedRepoWithRemote(t)
+	worktree := filepath.Join(t.TempDir(), "wt-track-main")
+
+	if err := a.CreateTrackingWorktree(context.Background(), repo, "main", "overseer/check/abc", worktree); err != nil {
+		t.Fatalf("CreateTrackingWorktree() error = %v", err)
+	}
+
+	if info, err := os.Stat(worktree); err != nil {
+		t.Fatalf("worktree path missing: %v", err)
+	} else if !info.IsDir() {
+		t.Fatalf("worktree path is not a directory: %v", info.Mode())
+	}
+
+	head, err := exec.Command("git", "-C", worktree, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("git rev-parse HEAD: %v", err)
+	}
+	if got, want := string(head), "overseer/check/abc\n"; got != want {
+		t.Fatalf("worktree HEAD = %q, want %q", got, want)
+	}
+
+	upstream, err := exec.Command("git", "-C", worktree, "rev-parse", "--abbrev-ref", "@{u}").Output()
+	if err != nil {
+		t.Fatalf("git rev-parse @{u}: %v", err)
+	}
+	if got, want := string(upstream), "origin/main\n"; got != want {
+		t.Fatalf("worktree upstream = %q, want %q", got, want)
+	}
+}
+
+func TestAdapter_CreateTrackingWorktree_FallsBackWhenNoOriginRef(t *testing.T) {
+	a, err := git.New(discardLogger())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	repo := seedRepo(t)
+	worktree := filepath.Join(t.TempDir(), "wt-no-origin")
+
+	if err := a.CreateTrackingWorktree(context.Background(), repo, "main", "overseer/check/abc", worktree); err != nil {
+		t.Fatalf("CreateTrackingWorktree() error = %v", err)
+	}
+
+	head, err := exec.Command("git", "-C", worktree, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("git rev-parse HEAD: %v", err)
+	}
+	if got, want := string(head), "overseer/check/abc\n"; got != want {
+		t.Fatalf("worktree HEAD = %q, want %q", got, want)
+	}
+
+	if _, err := exec.Command("git", "-C", worktree, "rev-parse", "--abbrev-ref", "@{u}").Output(); err == nil {
+		t.Fatal("fallback worktree should have no upstream, got one")
+	}
+}
+
+func TestAdapter_CreateTrackingWorktree_FailsForMissingBranch(t *testing.T) {
+	a, err := git.New(discardLogger())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	repo := seedRepo(t)
+	worktree := filepath.Join(t.TempDir(), "wt-missing")
+
+	err = a.CreateTrackingWorktree(context.Background(), repo, "no-such-branch", "overseer/check/abc", worktree)
+	if err == nil {
+		t.Fatal("CreateTrackingWorktree() error = nil, want non-nil for missing branch")
+	}
+}

@@ -102,6 +102,12 @@ func prStateStyle(s *styles.SessionDetailsStyles, state domain.PRState) lipgloss
 
 func (m Model) renderWorktreeSection(width int) []string {
 	s := &m.styles.SessionDetails
+	if m.session.IsCheckout() {
+		rows := make([]string, 0, 2)
+		rows = append(rows, glyphLine(s, glyphBaseBranch, m.session.BaseBranch+"  (tracking)", width))
+		rows = append(rows, pathLine(s, glyphWorktree, m.session.WorktreePath, width))
+		return rows
+	}
 	rows := make([]string, 0, 3)
 	rows = append(rows, glyphLine(s, glyphFeatureBranch, m.session.FeatureBranch, width))
 	rows = append(rows, glyphLine(s, glyphBaseBranch, m.session.BaseBranch, width))

@@ -69,9 +69,23 @@ func (s *Store) load() error {
 		s.projects[project.ID] = project
 	}
 	for _, sess := range schema.Sessions {
+		sess = normalizeSessionKind(sess)
 		s.sessions[sess.ID] = sess
 	}
 	return nil
+}
+
+// legacyOpenBranchKind is the value SessionKind held before the rename to
+// SessionKindCheckout. Translated on load so existing data files keep
+// working; the new value is written back the next time the session is
+// saved by the service layer.
+const legacyOpenBranchKind domain.SessionKind = "open-branch"
+
+func normalizeSessionKind(sess domain.Session) domain.Session {
+	if sess.Kind == legacyOpenBranchKind {
+		sess.Kind = domain.SessionKindCheckout
+	}
+	return sess
 }
 
 func (s *Store) quarantine(reason string) {
