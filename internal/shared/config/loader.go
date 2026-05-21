@@ -65,11 +65,11 @@ func Default() Config {
 		Logging: LoggingConfig{Level: "info"},
 		Storage: StorageConfig{DataDir: ""},
 		Launchers: []LauncherConfig{
-			{DisplayName: "OpenCode", Command: "opencode"},
-			{DisplayName: "Claude Code", Command: "claude"},
+			{DisplayName: "OpenCode (default)", Command: "opencode"},
+			{DisplayName: "Claude Code (default)", Command: "claude"},
 		},
 		Editors: []EditorConfig{
-			{DisplayName: "VSCode", Command: "code"},
+			{DisplayName: "VSCode (default)", Command: "code"},
 		},
 		Labels: defaultLabelConfigs(),
 	}
