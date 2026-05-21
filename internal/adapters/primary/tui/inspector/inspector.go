@@ -17,8 +17,7 @@ import (
 const tabStripHeight = 1
 
 var (
-	NextViewKeyBinding = key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "next view"))
-	PrevViewKeyBinding = key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "prev view"))
+	ToggleViewKeyBinding = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "toggle view"))
 )
 
 // Model is the dashboard's right panel. It owns a fixed list of preview views
@@ -67,12 +66,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
-		switch {
-		case key.Matches(msg, NextViewKeyBinding):
+		if key.Matches(msg, ToggleViewKeyBinding) {
 			m.activeIx = (m.activeIx + 1) % len(m.views)
-			return m, m.views[m.activeIx].Init()
-		case key.Matches(msg, PrevViewKeyBinding):
-			m.activeIx = (m.activeIx - 1 + len(m.views)) % len(m.views)
 			return m, m.views[m.activeIx].Init()
 		}
 		return m, nil

@@ -18,6 +18,10 @@ func newTestModel(t *testing.T) Model {
 }
 
 func keyPress(value string) tea.KeyPressMsg {
+	switch value {
+	case "tab":
+		return tea.KeyPressMsg{Code: tea.KeyTab}
+	}
 	return tea.KeyPressMsg{Text: value, Code: []rune(value)[0]}
 }
 
@@ -28,32 +32,23 @@ func TestInspector_StartsOnAgentView(t *testing.T) {
 	}
 }
 
-func TestInspector_NextKey_CyclesForward(t *testing.T) {
+func TestInspector_ToggleKey_CyclesForward(t *testing.T) {
 	m := newTestModel(t)
-	updated, _ := m.Update(keyPress("p"))
+	updated, _ := m.Update(keyPress("tab"))
 	m = updated.(Model)
 	if got := m.views[m.activeIx].Label(); got != "Shell" {
-		t.Errorf("after p, active view label = %q, want %q", got, "Shell")
+		t.Errorf("after tab, active view label = %q, want %q", got, "Shell")
 	}
 }
 
-func TestInspector_NextKey_WrapsAround(t *testing.T) {
+func TestInspector_ToggleKey_WrapsAround(t *testing.T) {
 	m := newTestModel(t)
 	for i := 0; i < 2; i++ {
-		updated, _ := m.Update(keyPress("p"))
+		updated, _ := m.Update(keyPress("tab"))
 		m = updated.(Model)
 	}
 	if got := m.views[m.activeIx].Label(); got != "Agent" {
-		t.Errorf("after 2x p, active view label = %q, want %q", got, "Agent")
-	}
-}
-
-func TestInspector_PrevKey_CyclesBackward(t *testing.T) {
-	m := newTestModel(t)
-	updated, _ := m.Update(keyPress("P"))
-	m = updated.(Model)
-	if got := m.views[m.activeIx].Label(); got != "Shell" {
-		t.Errorf("after P, active view label = %q, want %q", got, "Shell")
+		t.Errorf("after 2x tab, active view label = %q, want %q", got, "Agent")
 	}
 }
 
@@ -97,7 +92,7 @@ func TestInspector_PreviewCapturedMsg_OnlyActiveViewProcesses(t *testing.T) {
 	}
 
 	// Switch to Shell and send an Agent-kind message; Shell should ignore it.
-	updated, _ = m.Update(keyPress("p"))
+	updated, _ = m.Update(keyPress("tab"))
 	m = updated.(Model)
 	staleMsg := previewCapturedMsg{
 		kind:         viewKindAgent,

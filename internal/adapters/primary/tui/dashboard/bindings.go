@@ -9,7 +9,6 @@ import (
 var (
 	newSessionKeyBinding    = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new session"))
 	checkoutBranchKeyBinding    = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "checkout branch"))
-	nextPaneKeyBinding      = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane"))
 	helpMenuKeyBinding      = key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help menu"))
 	quitKeyBinding          = key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit"), key.WithHelp("ctrl+c", "quit"))
 	attachShellKeyBinding   = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "attach shell"))
@@ -17,6 +16,5 @@ var (
 	openEditorKeyBinding    = key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "open editor"))
 	deleteSessionKeyBinding = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete session"))
 
-	sessionsKeyBindings     = []key.Binding{newSessionKeyBinding, checkoutBranchKeyBinding, attachShellKeyBinding, attachAgentKeyBinding, openEditorKeyBinding, deleteSessionKeyBinding, inspector.NextViewKeyBinding, inspector.PrevViewKeyBinding, nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
-	detailsPanelKeyBindings = []key.Binding{inspector.NextViewKeyBinding, inspector.PrevViewKeyBinding, nextPaneKeyBinding, helpMenuKeyBinding, quitKeyBinding}
+	sessionsKeyBindings = []key.Binding{newSessionKeyBinding, checkoutBranchKeyBinding, attachShellKeyBinding, attachAgentKeyBinding, openEditorKeyBinding, deleteSessionKeyBinding, inspector.ToggleViewKeyBinding, helpMenuKeyBinding, quitKeyBinding}
 )

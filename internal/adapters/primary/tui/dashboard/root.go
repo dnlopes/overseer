@@ -53,7 +53,6 @@ type Model struct {
 	minWidth        int
 	minHeight       int
 	tooSmall        bool
-	leftPaneFocused bool
 	styles          *styles.Styles
 	sessionsService service.SessionService
 	projectsService service.ProjectService
@@ -87,7 +86,6 @@ func New(
 		editors:         editors,
 		minWidth:        minWidth,
 		minHeight:       minHeight,
-		leftPaneFocused: true,
 		prStatuses:      make(map[uuid.UUID]shared.PRStatusUpdatedMsg),
 	}
 	return m
@@ -181,13 +179,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, handled := m.handleKey(keyMsg); handled {
 			return m, cmd
 		}
-		if m.leftPaneFocused {
-			var cmd tea.Cmd
-			m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
-			return m, cmd
-		}
 		var cmd tea.Cmd
-		m.inspector, cmd = shared.UpdateModel(m.inspector, msg)
+		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
 		return m, cmd
 	}
 
@@ -206,40 +199,34 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		m.helpBar, cmd = shared.UpdateModel(m.helpBar, msg)
 		return cmd, true
 	}
-	if key.Matches(msg, nextPaneKeyBinding) {
-		m.toggleLeftRightFocus()
-		return nil, true
-	}
-	if key.Matches(msg, inspector.NextViewKeyBinding) || key.Matches(msg, inspector.PrevViewKeyBinding) {
+	if key.Matches(msg, inspector.ToggleViewKeyBinding) {
 		var cmd tea.Cmd
 		m.inspector, cmd = shared.UpdateModel(m.inspector, msg)
 		return cmd, true
 	}
-	if m.leftPaneFocused {
-		if key.Matches(msg, newSessionKeyBinding) {
-			m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors)
-			m.activePopup = popupNewSession
-			return m.createForm.Init(), true
+	if key.Matches(msg, newSessionKeyBinding) {
+		m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors)
+		m.activePopup = popupNewSession
+		return m.createForm.Init(), true
+	}
+	if key.Matches(msg, checkoutBranchKeyBinding) {
+		m.checkoutBranchForm = sessionui.NewCheckoutBranchForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors)
+		m.activePopup = popupCheckoutBranch
+		return m.checkoutBranchForm.Init(), true
+	}
+	if key.Matches(msg, attachShellKeyBinding) {
+		if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
+			return cmd, true
 		}
-		if key.Matches(msg, checkoutBranchKeyBinding) {
-			m.checkoutBranchForm = sessionui.NewCheckoutBranchForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors)
-			m.activePopup = popupCheckoutBranch
-			return m.checkoutBranchForm.Init(), true
+	}
+	if key.Matches(msg, attachAgentKeyBinding) {
+		if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
+			return cmd, true
 		}
-		if key.Matches(msg, attachShellKeyBinding) {
-			if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
-				return cmd, true
-			}
-		}
-		if key.Matches(msg, attachAgentKeyBinding) {
-			if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
-				return cmd, true
-			}
-		}
-		if key.Matches(msg, openEditorKeyBinding) {
-			if cmd := m.openSelectedSessionEditorCmd(); cmd != nil {
-				return cmd, true
-			}
+	}
+	if key.Matches(msg, openEditorKeyBinding) {
+		if cmd := m.openSelectedSessionEditorCmd(); cmd != nil {
+			return cmd, true
 		}
 	}
 	return nil, false
@@ -291,20 +278,6 @@ func (m Model) openSelectedSessionEditorCmd() tea.Cmd {
 		_, err := svc.OpenEditor(context.Background(), service.OpenEditorRequest{ID: sessID})
 		return shared.SessionEditorLaunchedMsg{Err: err}
 	}
-}
-
-func (m *Model) toggleLeftRightFocus() {
-	if m.leftPaneFocused {
-		m.leftPaneFocused = false
-		m.leftPane.SetFocus(false)
-		m.inspector.SetFocus(true)
-		m.helpBar.SetBindings(detailsPanelKeyBindings)
-		return
-	}
-	m.leftPaneFocused = true
-	m.leftPane.SetFocus(true)
-	m.inspector.SetFocus(false)
-	m.helpBar.SetBindings(sessionsKeyBindings)
 }
 
 func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
