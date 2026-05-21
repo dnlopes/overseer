@@ -33,7 +33,7 @@ func (r Resolver) WorktreeRoot() string {
 }
 
 func (r Resolver) SessionWorktreePath(sessionID uuid.UUID) string {
-	return filepath.Join(r.WorktreeRoot(), sessionID.String())
+	return filepath.Join(r.WorktreeRoot(), shortUUID(sessionID))
 }
 
 // ConfigFile is a package-level bootstrap helper used to locate the config
@@ -53,7 +53,7 @@ func ConfigFile() string {
 // session's worktree: "overseer/<session-id>". The session UUID guarantees
 // the branch name is unique within the repository.
 func SessionFeatureBranch(sessionID uuid.UUID) string {
-	return "overseer/" + sessionID.String()
+	return "overseer/" + shortUUID(sessionID)
 }
 
 // SessionTrackingBranch is the convention-based git branch name for a
@@ -62,7 +62,7 @@ func SessionFeatureBranch(sessionID uuid.UUID) string {
 // branch` can tell at a glance which sessions are feature work and which
 // are check / draft views.
 func SessionTrackingBranch(sessionID uuid.UUID) string {
-	return "overseer/check/" + sessionID.String()
+	return "overseer/checkout/" + shortUUID(sessionID)
 }
 
 func EnsureDir(dir string) error {
@@ -115,4 +115,8 @@ func defaultStateDir() string {
 		return ""
 	}
 	return filepath.Join(home, ".local", "state", "overseer")
+}
+
+func shortUUID(id uuid.UUID) string {
+	return id.String()[:8]
 }

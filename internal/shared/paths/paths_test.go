@@ -64,7 +64,7 @@ func TestResolver_SessionWorktreePath_UsesUUIDUnderWorktreeRoot(t *testing.T) {
 	r := NewResolver("/custom/data")
 	id := uuid.New()
 	got := r.SessionWorktreePath(id)
-	want := filepath.Join("/custom/data", "worktrees", id.String())
+	want := filepath.Join("/custom/data", "worktrees", id.String()[:8])
 	if got != want {
 		t.Fatalf("Resolver.SessionWorktreePath() = %q, want %q", got, want)
 	}
@@ -161,7 +161,7 @@ func TestEnsureDirCreatesDirectory(t *testing.T) {
 func TestSessionFeatureBranchUsesOverseerPrefix(t *testing.T) {
 	sessionID := uuid.New()
 	got := SessionFeatureBranch(sessionID)
-	want := "overseer/" + sessionID.String()
+	want := "overseer/" + sessionID.String()[:8]
 	if got != want {
 		t.Fatalf("SessionFeatureBranch() = %q, want %q", got, want)
 	}
