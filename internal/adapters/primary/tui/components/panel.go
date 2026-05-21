@@ -18,9 +18,15 @@ func Panel(s *styles.Styles, content string, focused bool) string {
 
 func PanelWithSize(s *styles.Styles, content string, focused bool, width, height int) tea.View {
 	border := panelBorder(s, focused)
-	innerW, innerH := PanelInnerSize(s, focused, width, height)
+	borderW, borderH := border.GetFrameSize()
 
-	content = s.Pane.Container.Width(innerW).Height(innerH).Render(content)
+	// lipgloss v2 treats Style.Width(N) as the TOTAL box width including
+	// padding. To make the container fill the border interior exactly
+	// (no gap on the right), its width must be (width - borderW); the
+	// content area inside the container is then PanelInnerSize.
+	containerOuterW := max(width-borderW, 0)
+	containerOuterH := max(height-borderH, 0)
+	content = s.Pane.Container.Width(containerOuterW).Height(containerOuterH).Render(content)
 	return tea.NewView(border.Width(width).Height(height).Render(content))
 }
 
