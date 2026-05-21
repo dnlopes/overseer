@@ -137,7 +137,10 @@ func fanOutPRFetches(prSvc *service.PullRequestService, data pollData) []tea.Cmd
 		if !ok {
 			continue
 		}
-		sid, branch, repoPath := sess.ID, sess.Name, project.Path
+		if sess.FeatureBranch == "" {
+			continue
+		}
+		sid, branch, repoPath := sess.ID, sess.FeatureBranch, project.Path
 		cmds = append(cmds, shared.Request(
 			func(ctx context.Context) (domain.PullRequest, error) {
 				resp, err := prSvc.GetForBranch(ctx, service.GetPullRequestForBranchRequest{
