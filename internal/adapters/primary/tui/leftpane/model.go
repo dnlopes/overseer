@@ -10,31 +10,40 @@ import (
 
 	projectui "github.com/dnlopes/overseer/internal/adapters/primary/tui/project"
 	sessionui "github.com/dnlopes/overseer/internal/adapters/primary/tui/session"
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/sessiondetails"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 )
 
+// sessionDetailsHeightPercent is the share of the post-tab content height
+// reserved for the session-details card on the Sessions tab. The remainder
+// goes to the session list above. No minimum floor: on short terminals the
+// card clips gracefully (least-important rows drop first via the renderer).
+const sessionDetailsHeightPercent = 50
+
 type Model struct {
-	sessions sessionui.Model
-	projects projectui.Model
-	active   shared.LeftPaneTab
-	styles   *styles.Styles
-	width    int
-	height   int
-	focused  bool
+	sessions       sessionui.Model
+	projects       projectui.Model
+	sessionDetails sessiondetails.Model
+	active         shared.LeftPaneTab
+	styles         *styles.Styles
+	width          int
+	height         int
+	focused        bool
 }
 
-func New(s *styles.Styles, sessions sessionui.Model, projects projectui.Model) Model {
+func New(s *styles.Styles, sessions sessionui.Model, projects projectui.Model, details sessiondetails.Model) Model {
 	return Model{
-		sessions: sessions,
-		projects: projects,
-		active:   shared.LeftPaneTabSessions,
-		styles:   s,
+		sessions:       sessions,
+		projects:       projects,
+		sessionDetails: details,
+		active:         shared.LeftPaneTabSessions,
+		styles:         s,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.sessions.Init(), m.projects.Init())
+	return tea.Batch(m.sessions.Init(), m.projects.Init(), m.sessionDetails.Init())
 }
 
 func (m Model) ActiveTab() shared.LeftPaneTab {
@@ -70,22 +79,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch typed := msg.(type) {
-	case shared.SessionsLoadedMsg, shared.SessionCreatedMsg, shared.SessionReorderedMsg, shared.SessionDeletedMsg:
+	case shared.SessionsLoadedMsg:
+		return m, shared.Broadcast(typed,
+			shared.Forward(&m.sessions),
+			shared.Forward(&m.sessionDetails),
+		)
+	case shared.SessionCreatedMsg, shared.SessionReorderedMsg, shared.SessionDeletedMsg:
 		var cmd tea.Cmd
 		m.sessions, cmd = shared.UpdateModel(m.sessions, typed)
 		return m, cmd
+	case shared.SessionSelectedMsg, shared.PRStatusUpdatedMsg:
+		var cmd tea.Cmd
+		m.sessionDetails, cmd = shared.UpdateModel(m.sessionDetails, typed)
+		return m, cmd
 	case shared.ProjectsLoadedMsg, shared.ProjectRegisteredMsg:
-		var cmds []tea.Cmd
-		var c1, c2 tea.Cmd
-		m.projects, c1 = shared.UpdateModel(m.projects, typed)
-		m.sessions, c2 = shared.UpdateModel(m.sessions, typed)
-		if c1 != nil {
-			cmds = append(cmds, c1)
-		}
-		if c2 != nil {
-			cmds = append(cmds, c2)
-		}
-		return m, tea.Batch(cmds...)
+		return m, shared.Broadcast(typed,
+			shared.Forward(&m.projects),
+			shared.Forward(&m.sessions),
+		)
 	}
 
 	var cmd tea.Cmd
@@ -106,9 +117,24 @@ func (m *Model) SetSize(width, height int) {
 
 func (m *Model) applySize() {
 	tabsHeight := 1
-	childHeight := max(m.height-tabsHeight, 1)
-	m.sessions.SetSize(m.width, childHeight)
-	m.projects.SetSize(m.width, childHeight)
+	contentHeight := max(m.height-tabsHeight, 1)
+	switch m.active {
+	case shared.LeftPaneTabSessions:
+		listH, detailsH := splitSessionsHeight(contentHeight)
+		m.sessions.SetSize(m.width, listH)
+		m.sessionDetails.SetSize(m.width, detailsH)
+		m.projects.SetSize(m.width, contentHeight)
+	case shared.LeftPaneTabProjects:
+		m.projects.SetSize(m.width, contentHeight)
+		m.sessions.SetSize(m.width, contentHeight)
+		m.sessionDetails.SetSize(m.width, 0)
+	}
+}
+
+func splitSessionsHeight(contentHeight int) (listH, detailsH int) {
+	detailsH = contentHeight * sessionDetailsHeightPercent / 100
+	listH = max(contentHeight-detailsH, 1)
+	return
 }
 
 func (m *Model) SetFocus(focused bool) {
@@ -145,17 +171,23 @@ func (m Model) SelectedSessionID() string {
 func (m Model) View() tea.View {
 	tabsRow := m.renderTabs()
 	tabsHeight := lipgloss.Height(tabsRow)
-	childHeight := max(m.height-tabsHeight, 1)
+	contentHeight := max(m.height-tabsHeight, 1)
 
 	var childContent string
 	switch m.active {
 	case shared.LeftPaneTabSessions:
+		listH, detailsH := splitSessionsHeight(contentHeight)
 		sessions := m.sessions
-		sessions.SetSize(m.width, childHeight)
-		childContent = sessions.View().Content
+		sessions.SetSize(m.width, listH)
+		details := m.sessionDetails
+		details.SetSize(m.width, detailsH)
+		childContent = lipgloss.JoinVertical(lipgloss.Left,
+			sessions.View().Content,
+			details.View().Content,
+		)
 	case shared.LeftPaneTabProjects:
 		projects := m.projects
-		projects.SetSize(m.width, childHeight)
+		projects.SetSize(m.width, contentHeight)
 		childContent = projects.View().Content
 	}
 

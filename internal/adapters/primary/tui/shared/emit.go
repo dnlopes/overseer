@@ -9,7 +9,7 @@ import (
 
 // Emit packages a Msg as a Cmd. Use to announce events from inside Update.
 //
-//	return p, primitives.Emit(SessionSelectedMsg{Name: name})
+//	return p, primitives.Emit(SessionSelectedMsg{Session: sess})
 func Emit[T any](msg T) tea.Cmd {
 	return func() tea.Msg { return msg }
 }

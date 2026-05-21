@@ -85,6 +85,17 @@ type TabStyles struct {
 	Bar      lipgloss.Style
 }
 
+type SessionDetailsStyles struct {
+	Name    lipgloss.Style
+	Glyph   lipgloss.Style
+	Value   lipgloss.Style
+	Good    lipgloss.Style
+	Bad     lipgloss.Style
+	Warn    lipgloss.Style
+	Special lipgloss.Style
+	Hint    lipgloss.Style
+}
+
 type Styles struct {
 	Border   BorderStyles
 	TitleBar struct {
@@ -131,11 +142,12 @@ type Styles struct {
 	Divider struct {
 		Horizontal lipgloss.Style
 	}
-	Help       HelpStyles
-	EmptyState EmptyStateStyles
-	TooSmall   TooSmallStyles
-	Layout     LayoutStyles
-	Tab        TabStyles
+	Help           HelpStyles
+	EmptyState     EmptyStateStyles
+	TooSmall       TooSmallStyles
+	Layout         LayoutStyles
+	Tab            TabStyles
+	SessionDetails SessionDetailsStyles
 }
 
 func New() *Styles {
@@ -277,6 +289,16 @@ func New() *Styles {
 			Active:   lipgloss.NewStyle().Foreground(theme.TitleText).Background(theme.Primary).Bold(true).Padding(0, 2),
 			Inactive: lipgloss.NewStyle().Foreground(theme.Subtext).Padding(0, 2),
 			Bar:      lipgloss.NewStyle().Foreground(theme.Border),
+		},
+		SessionDetails: SessionDetailsStyles{
+			Name:    lipgloss.NewStyle().Foreground(theme.Text).Bold(true),
+			Glyph:   lipgloss.NewStyle().Foreground(theme.Muted),
+			Value:   lipgloss.NewStyle().Foreground(theme.Text),
+			Good:    lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),
+			Bad:     lipgloss.NewStyle().Foreground(theme.Danger).Bold(true),
+			Warn:    lipgloss.NewStyle().Foreground(theme.Warning).Bold(true),
+			Special: lipgloss.NewStyle().Foreground(theme.Primary).Bold(true),
+			Hint:    lipgloss.NewStyle().Foreground(theme.Subtext).Italic(true),
 		},
 	}
 }

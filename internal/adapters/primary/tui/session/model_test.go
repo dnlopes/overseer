@@ -36,8 +36,8 @@ func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 	if !ok {
 		t.Fatalf("initial selection msg type = %T, want shared.SessionSelectedMsg", cmd())
 	}
-	if msg.ID != alpha.ID.String() {
-		t.Fatalf("initial SessionSelectedMsg.ID = %q, want %q", msg.ID, alpha.ID.String())
+	if msg.Session.ID != alpha.ID {
+		t.Fatalf("initial SessionSelectedMsg.Session.ID = %v, want %v", msg.Session.ID, alpha.ID)
 	}
 	view := updated.(Model).View().Content
 	for _, want := range []string{"▼ overseer", "alpha", "beta"} {
@@ -91,8 +91,8 @@ func TestModel_SelectionOnlyEmitsForSessionNodes(t *testing.T) {
 	if !ok {
 		t.Fatalf("selection msg type = %T, want shared.SessionSelectedMsg", cmd())
 	}
-	if msg.ID != alpha.ID.String() {
-		t.Fatalf("SessionSelectedMsg.ID = %q, want %q", msg.ID, alpha.ID.String())
+	if msg.Session.ID != alpha.ID {
+		t.Fatalf("SessionSelectedMsg.Session.ID = %v, want %v", msg.Session.ID, alpha.ID)
 	}
 
 }
@@ -222,9 +222,9 @@ func TestModel_CtrlDownMovesCursorFiveRows(t *testing.T) {
 	if !ok {
 		t.Fatalf("cmd msg type = %T, want shared.SessionSelectedMsg", cmd())
 	}
-	wantID := sessions[5].ID.String()
-	if msg.ID != wantID {
-		t.Fatalf("SessionSelectedMsg.ID = %q, want %q (initial session-a + 5 rows = session-f)", msg.ID, wantID)
+	wantID := sessions[5].ID
+	if msg.Session.ID != wantID {
+		t.Fatalf("SessionSelectedMsg.Session.ID = %v, want %v (initial session-a + 5 rows = session-f)", msg.Session.ID, wantID)
 	}
 }
 

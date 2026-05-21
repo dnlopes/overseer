@@ -84,12 +84,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.sessions = msg.Sessions
 		m.rebuildTree()
-		firstSessionID := firstSessionID(m.sessions)
-		if firstSessionID == "" {
+		if len(m.sessions) == 0 {
 			return m, nil
 		}
-		m.tree = m.tree.SelectID("session:" + firstSessionID)
-		return m, shared.Emit(shared.SessionSelectedMsg{ID: firstSessionID})
+		first := m.sessions[0]
+		m.tree = m.tree.SelectID("session:" + first.ID.String())
+		return m, shared.Emit(shared.SessionSelectedMsg{Session: first})
 	case shared.SessionReorderedMsg:
 		if msg.Err != nil {
 			return m, nil
@@ -97,8 +97,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = msg.Sessions
 		m.rebuildTree()
 		if msg.FocusID != "" {
-			m.tree = m.tree.SelectID("session:" + msg.FocusID)
-			return m, shared.Emit(shared.SessionSelectedMsg{ID: msg.FocusID})
+			if sess, ok := m.findSession(msg.FocusID); ok {
+				m.tree = m.tree.SelectID("session:" + msg.FocusID)
+				return m, shared.Emit(shared.SessionSelectedMsg{Session: sess})
+			}
 		}
 		return m, nil
 	case shared.SessionCreatedMsg:
@@ -107,7 +109,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.loadSessions()
 	case components.TreeSelectMsg[sessionNode]:
 		if msg.Item.kind == sessionNodeSession {
-			return m, shared.Emit(shared.SessionSelectedMsg{ID: msg.Item.sessionID})
+			if sess, ok := m.findSession(msg.Item.sessionID); ok {
+				return m, shared.Emit(shared.SessionSelectedMsg{Session: sess})
+			}
 		}
 		return m, nil
 	case tea.KeyPressMsg:
@@ -210,7 +214,20 @@ func (m Model) translateTreeSelection(cmd tea.Cmd) tea.Cmd {
 	if !ok || cur.kind != sessionNodeSession {
 		return nil
 	}
-	return shared.Emit(shared.SessionSelectedMsg{ID: cur.sessionID})
+	sess, ok := m.findSession(cur.sessionID)
+	if !ok {
+		return nil
+	}
+	return shared.Emit(shared.SessionSelectedMsg{Session: sess})
+}
+
+func (m Model) findSession(id string) (domain.Session, bool) {
+	for _, sess := range m.sessions {
+		if sess.ID.String() == id {
+			return sess, true
+		}
+	}
+	return domain.Session{}, false
 }
 
 func (m *Model) SetSize(width, height int) {
@@ -325,13 +342,6 @@ func sessionTreeNode(sess domain.Session) components.TreeNode[sessionNode] {
 			label:     sess.Name,
 		},
 	}
-}
-
-func firstSessionID(sessions []domain.Session) string {
-	if len(sessions) == 0 {
-		return ""
-	}
-	return sessions[0].ID.String()
 }
 
 func renderSessionNode(s *styles.Styles) components.TreeRenderFunc[sessionNode] {
