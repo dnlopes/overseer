@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dnlopes/overseer/internal/shared/config"
 	"github.com/dnlopes/overseer/internal/shared/errs"
@@ -21,6 +22,9 @@ func TestDefault_ReturnsCorrectValues(t *testing.T) {
 	}
 	if cfg.Dashboard.MinHeight != 15 {
 		t.Errorf("MinHeight: want 15, got %d", cfg.Dashboard.MinHeight)
+	}
+	if cfg.Dashboard.PreviewRefreshInterval != "500ms" {
+		t.Errorf("PreviewRefreshInterval: want 500ms, got %s", cfg.Dashboard.PreviewRefreshInterval)
 	}
 	if cfg.Logging.Level != "info" {
 		t.Errorf("Logging.Level: want info, got %s", cfg.Logging.Level)
@@ -468,5 +472,115 @@ func TestDomainEditors_InvalidEntry_ReturnsInvalidInput(t *testing.T) {
 	}
 	if !errs.Is(err, errs.ErrInvalidInput) {
 		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
+	}
+}
+
+func TestLoad_PreviewRefreshIntervalKey_OverridesDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "dashboard:\n  previewRefreshInterval: 2s\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Dashboard.PreviewRefreshInterval != "2s" {
+		t.Errorf("PreviewRefreshInterval: want 2s, got %s", cfg.Dashboard.PreviewRefreshInterval)
+	}
+	got, err := cfg.PreviewRefreshDuration()
+	if err != nil {
+		t.Fatalf("PreviewRefreshDuration() error = %v", err)
+	}
+	if got != 2*time.Second {
+		t.Errorf("PreviewRefreshDuration() = %v, want 2s", got)
+	}
+}
+
+func TestLoad_PreviewRefreshIntervalOmitted_KeepsDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "dashboard:\n  minWidth: 100\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Dashboard.PreviewRefreshInterval != "500ms" {
+		t.Errorf("PreviewRefreshInterval: omitting field should preserve 500ms default, got %s", cfg.Dashboard.PreviewRefreshInterval)
+	}
+}
+
+func TestLoad_InvalidPreviewRefreshInterval_RejectedWithInvalidInput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "dashboard:\n  previewRefreshInterval: not-a-duration\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.Load(path)
+	if err == nil {
+		t.Fatal("expected error for unparseable duration, got nil")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
+	}
+}
+
+func TestLoad_ZeroPreviewRefreshInterval_RejectedWithInvalidInput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "dashboard:\n  previewRefreshInterval: 0s\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.Load(path)
+	if err == nil {
+		t.Fatal("expected error for zero duration, got nil")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
+	}
+}
+
+func TestLoad_NegativePreviewRefreshInterval_RejectedWithInvalidInput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "dashboard:\n  previewRefreshInterval: -1s\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.Load(path)
+	if err == nil {
+		t.Fatal("expected error for negative duration, got nil")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
+	}
+}
+
+func TestPreviewRefreshDuration_DefaultParsesTo500ms(t *testing.T) {
+	cfg := config.Default()
+	got, err := cfg.PreviewRefreshDuration()
+	if err != nil {
+		t.Fatalf("PreviewRefreshDuration() error = %v", err)
+	}
+	if got != 500*time.Millisecond {
+		t.Errorf("PreviewRefreshDuration() = %v, want 500ms", got)
 	}
 }

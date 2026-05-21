@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	yamlv3 "gopkg.in/yaml.v3"
 
@@ -14,8 +15,9 @@ import (
 )
 
 type DashboardConfig struct {
-	MinWidth  int `yaml:"minWidth"`
-	MinHeight int `yaml:"minHeight"`
+	MinWidth               int    `yaml:"minWidth"`
+	MinHeight              int    `yaml:"minHeight"`
+	PreviewRefreshInterval string `yaml:"previewRefreshInterval"`
 }
 
 type LoggingConfig struct {
@@ -49,8 +51,9 @@ func Default() Config {
 	return Config{
 		Theme: "dark",
 		Dashboard: DashboardConfig{
-			MinWidth:  60,
-			MinHeight: 15,
+			MinWidth:               60,
+			MinHeight:              15,
+			PreviewRefreshInterval: "500ms",
 		},
 		Logging: LoggingConfig{Level: "info"},
 		Storage: StorageConfig{DataDir: ""},
@@ -99,6 +102,9 @@ func (c Config) Validate() error {
 	if c.Dashboard.MinHeight <= 0 {
 		return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: minHeight must be > 0, got %d", c.Dashboard.MinHeight))
 	}
+	if _, err := c.PreviewRefreshDuration(); err != nil {
+		return err
+	}
 
 	if c.Storage.DataDir != "" && !filepath.IsAbs(c.Storage.DataDir) {
 		return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: storage.dataDir %q must be absolute", c.Storage.DataDir))
@@ -134,6 +140,22 @@ func hasTopLevelKey(data []byte, key string) bool {
 		}
 	}
 	return false
+}
+
+// PreviewRefreshDuration parses Dashboard.PreviewRefreshInterval into a
+// time.Duration and ensures it is strictly positive. Wraps failures in
+// errs.ErrInvalidInput so callers can use errors.Is (same contract as
+// Validate).
+func (c Config) PreviewRefreshDuration() (time.Duration, error) {
+	raw := c.Dashboard.PreviewRefreshInterval
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: dashboard.previewRefreshInterval %q: %v", raw, err))
+	}
+	if d <= 0 {
+		return 0, errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: dashboard.previewRefreshInterval %q must be > 0", raw))
+	}
+	return d, nil
 }
 
 // DomainLaunchers wraps each entry in errs.ErrInvalidInput on failure so

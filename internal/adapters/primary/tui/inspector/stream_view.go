@@ -11,8 +11,6 @@ import (
 	"github.com/dnlopes/overseer/internal/core/service"
 )
 
-const pollInterval = 500 * time.Millisecond
-
 // streamView previews a tmux pane that streams content in real time (Agent or
 // Shell). Behaviour is identical between the two; only the targeted tmux
 // session and the placeholder strings differ.
@@ -29,9 +27,10 @@ type streamView struct {
 	err           error
 	service       service.SessionService
 	styles        *styles.Styles
+	pollInterval  time.Duration
 }
 
-func newAgentView(svc service.SessionService, s *styles.Styles) *streamView {
+func newAgentView(svc service.SessionService, s *styles.Styles, pollInterval time.Duration) *streamView {
 	return &streamView{
 		kind:            viewKindAgent,
 		label:           "Agent",
@@ -39,10 +38,11 @@ func newAgentView(svc service.SessionService, s *styles.Styles) *streamView {
 		notReadyMessage: "Agent not started — press ⏎ to launch",
 		service:         svc,
 		styles:          s,
+		pollInterval:    pollInterval,
 	}
 }
 
-func newShellView(svc service.SessionService, s *styles.Styles) *streamView {
+func newShellView(svc service.SessionService, s *styles.Styles, pollInterval time.Duration) *streamView {
 	return &streamView{
 		kind:            viewKindShell,
 		label:           "Shell",
@@ -50,6 +50,7 @@ func newShellView(svc service.SessionService, s *styles.Styles) *streamView {
 		notReadyMessage: "Shell session unavailable",
 		service:         svc,
 		styles:          s,
+		pollInterval:    pollInterval,
 	}
 }
 
@@ -143,7 +144,7 @@ func (v *streamView) capture() tea.Cmd {
 
 func (v *streamView) scheduleNext() tea.Cmd {
 	next := v.capture()
-	return tea.Tick(pollInterval, func(time.Time) tea.Msg {
+	return tea.Tick(v.pollInterval, func(time.Time) tea.Msg {
 		return next()
 	})
 }

@@ -2,6 +2,7 @@ package inspector
 
 import (
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -35,11 +36,11 @@ type Model struct {
 	styles    *styles.Styles
 }
 
-func New(s *styles.Styles, sessionService service.SessionService) Model {
+func New(s *styles.Styles, sessionService service.SessionService, previewRefreshInterval time.Duration) Model {
 	return Model{
 		views: []View{
-			newAgentView(sessionService, s),
-			newShellView(sessionService, s),
+			newAgentView(sessionService, s, previewRefreshInterval),
+			newShellView(sessionService, s, previewRefreshInterval),
 		},
 		activeIx: 0,
 		styles:   s,

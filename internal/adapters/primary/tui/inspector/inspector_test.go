@@ -2,6 +2,7 @@ package inspector
 
 import (
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/google/uuid"
@@ -14,7 +15,7 @@ import (
 
 func newTestModel(t *testing.T) Model {
 	t.Helper()
-	return New(styles.New(), service.SessionService{})
+	return New(styles.New(), service.SessionService{}, 500*time.Millisecond)
 }
 
 func keyPress(value string) tea.KeyPressMsg {
