@@ -77,6 +77,33 @@ func (a *Adapter) IsGitRepo(_ context.Context, path string) error {
 	return nil
 }
 
+// GetDefaultBranch resolves the default branch of the repository at repoPath.
+// It first tries `git symbolic-ref refs/remotes/origin/HEAD` (the upstream
+// default), then falls back to local "main"/"master". Returns
+// domain.ErrProjectNoDefaultBranch when no signal yields a branch.
+func (a *Adapter) GetDefaultBranch(_ context.Context, repoPath string) (string, error) {
+	if stdout, err := a.runIn(repoPath, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"); err == nil {
+		branch := strings.TrimPrefix(strings.TrimSpace(stdout), "origin/")
+		if branch != "" {
+			a.logger.Debug("git default branch resolved from origin/HEAD",
+				"repo", repoPath, "branch", branch,
+			)
+			return branch, nil
+		}
+	}
+
+	for _, candidate := range []string{"main", "master"} {
+		if _, err := a.runIn(repoPath, "rev-parse", "--verify", "--quiet", "refs/heads/"+candidate); err == nil {
+			a.logger.Debug("git default branch resolved from local fallback",
+				"repo", repoPath, "branch", candidate,
+			)
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("%w: %s", domain.ErrProjectNoDefaultBranch, repoPath)
+}
+
 // errGitNotARepo is returned by run when git reports the target path is not a
 // repository (or any directory above it).
 var errGitNotARepo = errors.New("git: not a repository")

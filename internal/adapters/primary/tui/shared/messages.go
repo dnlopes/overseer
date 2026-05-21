@@ -35,6 +35,8 @@ type SessionAttachReadyMsg struct {
 
 type SessionAttachedMsg struct{ Err error }
 
+type SessionEditorLaunchedMsg struct{ Err error }
+
 type SessionDeleteRequestedMsg struct{ Session domain.Session }
 
 type SessionDeletedMsg struct{}
@@ -51,19 +53,6 @@ type ProjectsLoadedMsg struct {
 type ProjectRegisteredMsg struct{ Project domain.Project }
 
 type ProjectRegisterErrMsg struct{ Err error }
-
-type ProjectSelectedMsg struct{ ID string }
-
-type NewProjectPopupCloseMsg struct{}
-
-type LeftPaneTab int
-
-const (
-	LeftPaneTabSessions LeftPaneTab = iota
-	LeftPaneTabProjects
-)
-
-type LeftPaneTabChangedMsg struct{ Tab LeftPaneTab }
 
 type JobsTickMsg struct{ JobID string }
 

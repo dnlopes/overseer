@@ -52,6 +52,16 @@ func main() {
 		defaultLauncher = launchers[0]
 	}
 
+	editors, err := cfg.DomainEditors()
+	if err != nil {
+		log.Error("resolve editors", "error", err)
+		os.Exit(1)
+	}
+	var defaultEditor domain.Editor
+	if len(editors) > 0 {
+		defaultEditor = editors[0]
+	}
+
 	store, err := storage.New(resolver.DataFile(), log)
 	if err != nil {
 		log.Error("initialize storage", "error", err)
@@ -72,7 +82,7 @@ func main() {
 
 	githubAdapter := githubcli.New(log)
 
-	sessionSvc := service.NewSessionService(store.Sessions(), store.Projects(), tmuxAdapter, gitAdapter, resolver, defaultLauncher, log)
+	sessionSvc := service.NewSessionService(store.Sessions(), store.Projects(), tmuxAdapter, gitAdapter, resolver, defaultLauncher, defaultEditor, log)
 	projectSvc := service.NewProjectService(store.Projects(), gitAdapter, log)
 	prSvc := service.NewPullRequestService(githubAdapter, log)
 
@@ -80,7 +90,7 @@ func main() {
 	scheduler := jobs.New(prJob)
 
 	s := styles.New()
-	dash := dashboard.New(s, *sessionSvc, *projectSvc, scheduler, launchers, cfg.Dashboard.MinWidth, cfg.Dashboard.MinHeight)
+	dash := dashboard.New(s, *sessionSvc, *projectSvc, scheduler, launchers, editors, cfg.Dashboard.MinWidth, cfg.Dashboard.MinHeight)
 	p := tea.NewProgram(altScreenModel{inner: dash})
 
 	if _, err := p.Run(); err != nil {

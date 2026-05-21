@@ -11,12 +11,12 @@ import (
 )
 
 // Session is the aggregate representing a single AI agent session.
-// ProjectID is uuid.Nil when the session is not associated with any project.
 //
-// Worktree fields (WorktreePath, BaseBranch, FeatureBranch) are an ensemble:
-// they are either all set (project-backed sessions, populated via
-// AssignWorktree) or all empty (project-less sessions, which shell into the
-// user's home directory).
+// Every session is bound to a Project (its git repository) — ProjectID is
+// required and rejected when uuid.Nil. The session's worktree is forked from
+// BaseBranch inside the project's repo, on a new branch FeatureBranch, at
+// WorktreePath. These three fields are populated together via AssignWorktree
+// before the session is persisted.
 type Session struct {
 	ID            uuid.UUID
 	Name          string
@@ -26,12 +26,14 @@ type Session struct {
 	BaseBranch    string
 	FeatureBranch string
 	AgentCommand  string
+	EditorCommand string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
 
-// NewSession constructs a Session with no worktree assigned. Callers that
-// need a project-backed session must follow up with AssignWorktree.
+// NewSession constructs a Session with no worktree assigned. Callers must
+// follow up with AssignWorktree before persisting; ProjectID is required and
+// uuid.Nil is rejected.
 func NewSession(name string, projectID uuid.UUID) (Session, error) {
 	name = strings.TrimSpace(name)
 
@@ -40,6 +42,9 @@ func NewSession(name string, projectID uuid.UUID) (Session, error) {
 	}
 	if len(name) > 100 {
 		return Session{}, ErrSessionNameTooLong
+	}
+	if projectID == uuid.Nil {
+		return Session{}, ErrSessionEmptyProjectID
 	}
 
 	now := time.Now()
@@ -138,6 +143,21 @@ func (s *Session) AssignAgentCommand(cmd string) error {
 	return nil
 }
 
+// AssignEditorCommand sets the raw shell command used to open this
+// session's worktree in an editor (e.g. "code", "cursor --wait", "nvim").
+// The command must be non-empty after trimming; empty values are rejected
+// so the invariant "if EditorCommand is set, it is runnable" holds.
+func (s *Session) AssignEditorCommand(cmd string) error {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return ErrSessionEmptyEditorCommand
+	}
+
+	s.EditorCommand = cmd
+	s.UpdatedAt = time.Now()
+	return nil
+}
+
 // Session ports.
 
 type SessionRepository interface {
@@ -156,17 +176,26 @@ type GitAdapter interface {
 	RemoveWorktree(ctx context.Context, repoPath, worktreePath string) error
 	// IsGitRepo reports whether path is the root of a git working tree.
 	IsGitRepo(ctx context.Context, path string) error
+	// GetDefaultBranch resolves the repository's default branch — typically
+	// the branch HEAD on origin points at, with a "main"/"master" fallback
+	// for repos without an origin remote. Returns ErrProjectNoDefaultBranch
+	// when neither signal is available.
+	GetDefaultBranch(ctx context.Context, repoPath string) (string, error)
 }
 
 // Session sentinel errors.
 var (
-	ErrSessionEmptyName               = errors.New("session name cannot be empty")
-	ErrSessionNameTooLong             = errors.New("session name exceeds 100 characters")
-	ErrSessionNotFound                = errors.New("session not found")
-	ErrSessionAlreadyExists           = errors.New("session already exists")
-	ErrSessionWorktreeFieldsMismatch  = errors.New("session worktree fields must all be set")
-	ErrSessionWorktreePathNotAbsolute = errors.New("session worktree path must be absolute")
-	ErrSessionWorktreePathOutsideRoot = errors.New("session worktree path is outside the managed worktree root")
-	ErrSessionEmptyAgentCommand       = errors.New("session agent command cannot be empty")
-	ErrSessionNoAgentCommandAvailable = errors.New("session has no agent command and no default launcher is configured")
+	ErrSessionEmptyName                = errors.New("session name cannot be empty")
+	ErrSessionNameTooLong              = errors.New("session name exceeds 100 characters")
+	ErrSessionEmptyProjectID           = errors.New("session project id cannot be empty")
+	ErrSessionEmptyBaseBranch          = errors.New("session base branch cannot be empty")
+	ErrSessionNotFound                 = errors.New("session not found")
+	ErrSessionAlreadyExists            = errors.New("session already exists")
+	ErrSessionWorktreeFieldsMismatch   = errors.New("session worktree fields must all be set")
+	ErrSessionWorktreePathNotAbsolute  = errors.New("session worktree path must be absolute")
+	ErrSessionWorktreePathOutsideRoot  = errors.New("session worktree path is outside the managed worktree root")
+	ErrSessionEmptyAgentCommand        = errors.New("session agent command cannot be empty")
+	ErrSessionNoAgentCommandAvailable  = errors.New("session has no agent command and no default launcher is configured")
+	ErrSessionEmptyEditorCommand       = errors.New("session editor command cannot be empty")
+	ErrSessionNoEditorCommandAvailable = errors.New("session has no editor command and no default editor is configured")
 )

@@ -64,4 +64,5 @@ var (
 	ErrProjectNotFound        = errors.New("project not found")
 	ErrProjectAlreadyExists   = errors.New("project already exists")
 	ErrProjectNotGitRepo      = errors.New("project path is not a git repository")
+	ErrProjectNoDefaultBranch = errors.New("project has no detectable default branch")
 )

@@ -31,11 +31,17 @@ type LauncherConfig struct {
 	Command     string `yaml:"command"`
 }
 
+type EditorConfig struct {
+	DisplayName string `yaml:"displayName"`
+	Command     string `yaml:"command"`
+}
+
 type Config struct {
 	Dashboard DashboardConfig  `yaml:"dashboard"`
 	Logging   LoggingConfig    `yaml:"logging"`
 	Storage   StorageConfig    `yaml:"storage"`
 	Launchers []LauncherConfig `yaml:"launchers"`
+	Editors   []EditorConfig   `yaml:"editors"`
 }
 
 func Default() Config {
@@ -49,6 +55,9 @@ func Default() Config {
 		Launchers: []LauncherConfig{
 			{DisplayName: "OpenCode", Command: "opencode"},
 			{DisplayName: "Claude Code", Command: "claude"},
+		},
+		Editors: []EditorConfig{
+			{DisplayName: "VSCode", Command: "code"},
 		},
 	}
 }
@@ -69,6 +78,9 @@ func Load(path string) (Config, error) {
 	}
 	if hasTopLevelKey(data, "launchers") {
 		cfg.Launchers = append(Default().Launchers, cfg.Launchers...)
+	}
+	if hasTopLevelKey(data, "editors") {
+		cfg.Editors = append(Default().Editors, cfg.Editors...)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -93,6 +105,12 @@ func (c Config) Validate() error {
 	for i, l := range c.Launchers {
 		if _, err := domain.NewLauncher(l.DisplayName, l.Command); err != nil {
 			return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: launchers[%d]: %v", i, err))
+		}
+	}
+
+	for i, e := range c.Editors {
+		if _, err := domain.NewEditor(e.DisplayName, e.Command); err != nil {
+			return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: editors[%d]: %v", i, err))
 		}
 	}
 
@@ -126,6 +144,20 @@ func (c Config) DomainLaunchers() ([]domain.Launcher, error) {
 			return nil, errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: launchers[%d]: %v", i, err))
 		}
 		out = append(out, launcher)
+	}
+	return out, nil
+}
+
+// DomainEditors wraps each entry in errs.ErrInvalidInput on failure so
+// callers can use errors.Is (same contract as Validate).
+func (c Config) DomainEditors() ([]domain.Editor, error) {
+	out := make([]domain.Editor, 0, len(c.Editors))
+	for i, e := range c.Editors {
+		editor, err := domain.NewEditor(e.DisplayName, e.Command)
+		if err != nil {
+			return nil, errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: editors[%d]: %v", i, err))
+		}
+		out = append(out, editor)
 	}
 	return out, nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dnlopes/overseer/internal/core/domain"
@@ -168,5 +169,52 @@ func TestProjectService_List_SortsByName(t *testing.T) {
 		if resp.Projects[i].Name != want {
 			t.Fatalf("Projects[%d].Name = %q, want %q", i, resp.Projects[i].Name, want)
 		}
+	}
+}
+
+// --- DetectDefaultBranch ---
+
+func TestProjectService_DetectDefaultBranch_HappyPath(t *testing.T) {
+	project := testutil.MakeProject("/repo/overseer", "overseer")
+	repo, git := newProjectMocks(t)
+	repo.EXPECT().Get(mock.Anything, project.ID).Return(project, nil).Once()
+	git.EXPECT().GetDefaultBranch(mock.Anything, project.Path).Return("trunk", nil).Once()
+
+	svc := NewProjectService(repo, git, testLogger())
+	resp, err := svc.DetectDefaultBranch(context.Background(), DetectDefaultBranchRequest{ProjectID: project.ID})
+
+	if err != nil {
+		t.Fatalf("DetectDefaultBranch() error = %v", err)
+	}
+	if resp.Branch != "trunk" {
+		t.Fatalf("DetectDefaultBranch() Branch = %q, want %q", resp.Branch, "trunk")
+	}
+}
+
+func TestProjectService_DetectDefaultBranch_ProjectNotFound(t *testing.T) {
+	missingID := uuid.New()
+	repo, git := newProjectMocks(t)
+	repo.EXPECT().Get(mock.Anything, missingID).Return(domain.Project{}, domain.ErrProjectNotFound).Once()
+
+	svc := NewProjectService(repo, git, testLogger())
+	_, err := svc.DetectDefaultBranch(context.Background(), DetectDefaultBranchRequest{ProjectID: missingID})
+
+	if !errors.Is(err, domain.ErrProjectNotFound) {
+		t.Fatalf("DetectDefaultBranch() error = %v, want %v", err, domain.ErrProjectNotFound)
+	}
+}
+
+func TestProjectService_DetectDefaultBranch_GitFailureBubblesUp(t *testing.T) {
+	project := testutil.MakeProject("/repo/overseer", "overseer")
+	repo, git := newProjectMocks(t)
+	repo.EXPECT().Get(mock.Anything, project.ID).Return(project, nil).Once()
+	git.EXPECT().GetDefaultBranch(mock.Anything, project.Path).
+		Return("", domain.ErrProjectNoDefaultBranch).Once()
+
+	svc := NewProjectService(repo, git, testLogger())
+	_, err := svc.DetectDefaultBranch(context.Background(), DetectDefaultBranchRequest{ProjectID: project.ID})
+
+	if !errors.Is(err, domain.ErrProjectNoDefaultBranch) {
+		t.Fatalf("DetectDefaultBranch() error = %v, want %v", err, domain.ErrProjectNoDefaultBranch)
 	}
 }
