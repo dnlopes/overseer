@@ -211,12 +211,14 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		return cmd, true
 	}
 	if key.Matches(msg, newSessionKeyBinding) {
-		m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors, m.width)
+		initialProjectID := m.cursorProjectID()
+		m.createForm = sessionui.NewCreateForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, initialProjectID, m.launchers, m.editors, m.width)
 		m.activePopup = popupNewSession
 		return m.createForm.Init(), true
 	}
 	if key.Matches(msg, checkoutBranchKeyBinding) {
-		m.checkoutBranchForm = sessionui.NewCheckoutBranchForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, m.launchers, m.editors, m.width)
+		initialProjectID := m.cursorProjectID()
+		m.checkoutBranchForm = sessionui.NewCheckoutBranchForm(m.styles, m.sessionsService, m.projectsService, m.cachedProjects, initialProjectID, m.launchers, m.editors, m.width)
 		m.activePopup = popupCheckoutBranch
 		return m.checkoutBranchForm.Init(), true
 	}
@@ -302,6 +304,13 @@ func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+func (m Model) cursorProjectID() uuid.UUID {
+	if sess, ok := m.leftPane.SelectedSession(); ok {
+		return sess.ProjectID
+	}
+	return uuid.Nil
 }
 
 func (m *Model) refreshProjectNameLookup() {

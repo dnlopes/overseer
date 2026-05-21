@@ -308,6 +308,16 @@ func (m Model) SelectedSessionID() string {
 	return cur.sessionID
 }
 
+// SelectedSession returns the session the cursor is currently on, or
+// (zero, false) when the cursor is on a group node or the list is empty.
+func (m Model) SelectedSession() (domain.Session, bool) {
+	cur, ok := m.tree.Selected()
+	if !ok || cur.kind != sessionNodeSession {
+		return domain.Session{}, false
+	}
+	return m.findSession(cur.sessionID)
+}
+
 func (m Model) View() tea.View {
 	content := m.tree.View()
 	if m.err != nil {

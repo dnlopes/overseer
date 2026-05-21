@@ -9,6 +9,7 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/sessiondetails"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
+	"github.com/dnlopes/overseer/internal/core/domain"
 )
 
 // sessionDetailsHeightPercent is the share of the left-pane height
@@ -83,6 +84,10 @@ func (m Model) IsFocused() bool {
 
 func (m Model) SelectedSessionID() string {
 	return m.sessions.SelectedSessionID()
+}
+
+func (m Model) SelectedSession() (domain.Session, bool) {
+	return m.sessions.SelectedSession()
 }
 
 func (m Model) View() tea.View {

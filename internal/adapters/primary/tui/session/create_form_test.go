@@ -4,8 +4,10 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
@@ -54,6 +56,37 @@ func TestCreateForm_RepoPickerCyclesProjects(t *testing.T) {
 	after := form.repoPicker.selectedProject()
 	if after == nil || after.ID == initial.ID {
 		t.Fatalf("after right: selected did not advance from %v to a different project (got %v)", initial.ID, after)
+	}
+}
+
+func TestCreateForm_RepoPickerPreselectsInitialProjectID(t *testing.T) {
+	older := testutil.MakeProject("/repo/older", "Older")
+	newer := testutil.MakeProject("/repo/newer", "Newer")
+	older.UpdatedAt = time.Now().Add(-time.Hour)
+	newer.UpdatedAt = time.Now()
+
+	svc, _, _, _, _ := newCreateFormSessionServiceWithMocks(t)
+	projectsSvc, _ := newProjectsServiceWithMocks(t)
+	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{older, newer}, older.ID, testLaunchers(t), testEditors(t), 100)
+
+	selected := form.repoPicker.selectedProject()
+	if selected == nil {
+		t.Fatalf("selected = nil, want %s", older.ID)
+	}
+	if selected.ID != older.ID {
+		t.Fatalf("selected = %s (%s), want %s (older) — newer should NOT win when older is explicitly initial", selected.ID, selected.Name, older.ID)
+	}
+}
+
+func TestCreateForm_RepoPickerFallsBackWhenInitialIDUnknown(t *testing.T) {
+	overseer := testutil.MakeProject("/repo/overseer", "Overseer")
+	svc, _, _, _, _ := newCreateFormSessionServiceWithMocks(t)
+	projectsSvc, _ := newProjectsServiceWithMocks(t)
+	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{overseer}, uuid.New(), testLaunchers(t), testEditors(t), 100)
+
+	selected := form.repoPicker.selectedProject()
+	if selected == nil || selected.ID != overseer.ID {
+		t.Fatalf("selected = %+v, want fallback to %s", selected, overseer.ID)
 	}
 }
 
@@ -109,7 +142,7 @@ func TestCreateForm_SubmitWithExistingProjectCallsServiceCreate(t *testing.T) {
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projectsSvc, _ := newProjectsServiceWithMocks(t)
-	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{overseer}, testLaunchers(t), testEditors(t), 100)
+	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{overseer}, uuid.Nil, testLaunchers(t), testEditors(t), 100)
 
 	updated, _ := tea.Model(form).Update(formKeyPress("alpha"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -164,7 +197,7 @@ func TestCreateForm_SubmitWithEmptyBaseBranchResolvesRepoDefault(t *testing.T) {
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projectsSvc, _ := newProjectsServiceWithMocks(t)
-	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{overseer}, testLaunchers(t), testEditors(t), 100)
+	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{overseer}, uuid.Nil, testLaunchers(t), testEditors(t), 100)
 
 	updated, _ := tea.Model(form).Update(formKeyPress("alpha"))
 	_, cmd := tea.Model(updated.(CreateFormModel)).Update(formKeyPress("enter"))
@@ -192,7 +225,7 @@ func TestCreateForm_SubmitForwardsUserProvidedFeatureBranch(t *testing.T) {
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projectsSvc, _ := newProjectsServiceWithMocks(t)
-	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{overseer}, testLaunchers(t), testEditors(t), 100)
+	form := NewCreateForm(styles.New(), svc, projectsSvc, []domain.Project{overseer}, uuid.Nil, testLaunchers(t), testEditors(t), 100)
 
 	updated, _ := tea.Model(form).Update(formKeyPress("alpha"))
 	updated, _ = updated.(CreateFormModel).Update(formKeyPress("tab"))
@@ -314,7 +347,7 @@ func newCreateFormForTest(t *testing.T, projects []domain.Project) CreateFormMod
 	t.Helper()
 	svc, _, _, _, _ := newCreateFormSessionServiceWithMocks(t)
 	projectsSvc, _ := newProjectsServiceWithMocks(t)
-	return NewCreateForm(styles.New(), svc, projectsSvc, projects, testLaunchers(t), testEditors(t), 100)
+	return NewCreateForm(styles.New(), svc, projectsSvc, projects, uuid.Nil, testLaunchers(t), testEditors(t), 100)
 }
 
 func newCreateFormSessionService(t *testing.T) service.SessionService {

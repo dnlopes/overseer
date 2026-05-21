@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/google/uuid"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
@@ -45,7 +46,9 @@ type CreateFormModel struct {
 }
 
 // NewCreateForm builds the session-create form. The supplied projects seed
-// the repo picker's "recent" list (ordered by UpdatedAt server-side).
+// the repo picker's "recent" list (ordered by UpdatedAt server-side). When
+// initialProjectID is non-Nil and present in projects, the repo picker
+// starts positioned on that project; otherwise it starts on the most-recent.
 // terminalWidth is the current terminal column count; the form clamps its
 // modal box to [formMinBoxWidth, formMaxBoxWidth] and sizes inputs to fit.
 func NewCreateForm(
@@ -53,6 +56,7 @@ func NewCreateForm(
 	sessionsService service.SessionService,
 	projectsService service.ProjectService,
 	projects []domain.Project,
+	initialProjectID uuid.UUID,
 	launchers []domain.Launcher,
 	editors []domain.Editor,
 	terminalWidth int,
@@ -81,7 +85,7 @@ func NewCreateForm(
 
 	return CreateFormModel{
 		nameInput:          nameInput,
-		repoPicker:         newRepoPicker(s, projects, inputWidth),
+		repoPicker:         newRepoPicker(s, projects, initialProjectID, inputWidth),
 		baseBranchInput:    baseBranchInput,
 		featureBranchInput: featureBranchInput,
 		launchers:          launchers,

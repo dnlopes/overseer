@@ -32,7 +32,7 @@ type repoPicker struct {
 	styles     *styles.Styles
 }
 
-func newRepoPicker(s *styles.Styles, projects []domain.Project, inputWidth int) repoPicker {
+func newRepoPicker(s *styles.Styles, projects []domain.Project, initialProjectID uuid.UUID, inputWidth int) repoPicker {
 	sorted := append([]domain.Project(nil), projects...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		return sorted[i].UpdatedAt.After(sorted[j].UpdatedAt)
@@ -44,10 +44,20 @@ func newRepoPicker(s *styles.Styles, projects []domain.Project, inputWidth int) 
 	pasteInput.SetWidth(inputWidth)
 	pasteInput.SetStyles(s.Form.Input)
 
+	listIdx := 0
+	if initialProjectID != uuid.Nil {
+		for i, p := range sorted {
+			if p.ID == initialProjectID {
+				listIdx = i
+				break
+			}
+		}
+	}
+
 	return repoPicker{
 		mode:       repoPickerModeList,
 		projects:   sorted,
-		listIdx:    0,
+		listIdx:    listIdx,
 		pasteInput: pasteInput,
 		styles:     s,
 	}
