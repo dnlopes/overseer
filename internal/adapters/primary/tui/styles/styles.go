@@ -18,7 +18,7 @@ import (
 // domain-named row styles that bake position into their definition
 // (Session.Item.PaddingLeft was that mistake). Position is data —
 // it belongs in the render function, computed from the tree's depth.
-const ListIndentUnit = 2
+const ListIndentUnit = 1
 
 type BorderStyles struct {
 	Focused     lipgloss.Style
