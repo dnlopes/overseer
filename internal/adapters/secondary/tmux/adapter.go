@@ -174,6 +174,34 @@ func (a *Adapter) ResizeWindow(_ context.Context, tmuxID string, width, height i
 	return nil
 }
 
+// GetPanePID returns the operating-system PID of the foreground process in
+// the active pane of the named tmux session. Used by the agent-activity
+// adapters as the root for the lsof descendant walk.
+//
+// This method is NOT part of domain.TmuxAdapter — it is a private adapter
+// capability consumed by other secondary adapters (claudejsonl,
+// opencodesqlite) via duck-typed interfaces. Keeping it off the port avoids
+// polluting the domain contract with an introspection method that no use
+// case directly needs.
+func (a *Adapter) GetPanePID(_ context.Context, tmuxID string) (int, error) {
+	stdout, err := a.run("list-panes", "-t", tmuxID, "-F", "#{pane_pid}")
+	if err != nil {
+		return 0, fmt.Errorf("tmux: get pane pid for %q: %w", tmuxID, err)
+	}
+	for _, line := range strings.Split(strings.TrimRight(stdout, "\n"), "\n") {
+		raw := strings.TrimSpace(line)
+		if raw == "" {
+			continue
+		}
+		pid, parseErr := strconv.Atoi(raw)
+		if parseErr != nil {
+			return 0, fmt.Errorf("tmux: parse pane pid %q for %q: %w", raw, tmuxID, parseErr)
+		}
+		return pid, nil
+	}
+	return 0, fmt.Errorf("tmux: no panes reported for %q: %w", tmuxID, domain.ErrTmuxSessionNotFound)
+}
+
 // errTmuxNoServer is returned by run when tmux reports that no server is running.
 var errTmuxNoServer = errors.New("tmux: no server running")
 

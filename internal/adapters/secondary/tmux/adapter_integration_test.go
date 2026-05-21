@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/secondary/tmux"
 	"github.com/dnlopes/overseer/internal/core/domain"
 )
+
+func syscallKill0(pid int) error { return syscall.Kill(pid, 0) }
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -258,5 +261,39 @@ func TestIntegration_Adapter_ResizeWindow_UnknownReturnsNotFound(t *testing.T) {
 	err := a.ResizeWindow(context.Background(), uniqueSessionName(t), 80, 24)
 	if !errors.Is(err, domain.ErrTmuxSessionNotFound) {
 		t.Errorf("ResizeWindow() unknown error = %v, want %v", err, domain.ErrTmuxSessionNotFound)
+	}
+}
+
+func TestIntegration_Adapter_GetPanePID_ReturnsLivePID(t *testing.T) {
+	a := newAdapter(t)
+	ctx := context.Background()
+	name := uniqueSessionName(t)
+
+	tmuxID, err := a.CreateSession(ctx, name, "", "sleep 30")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	t.Cleanup(func() { _ = a.KillSession(ctx, tmuxID) })
+
+	pid, err := a.GetPanePID(ctx, tmuxID)
+	if err != nil {
+		t.Fatalf("GetPanePID() error = %v, want nil", err)
+	}
+	if pid <= 1 {
+		t.Errorf("GetPanePID() = %d, want a real PID > 1", pid)
+	}
+	// The reported PID must belong to a live process: kill -0 returns no error
+	// if the process exists and the caller has permission to signal it.
+	if err := syscallKill0(pid); err != nil {
+		t.Errorf("kill -0 %d error = %v, want nil (PID should be alive)", pid, err)
+	}
+}
+
+func TestIntegration_Adapter_GetPanePID_UnknownReturnsNotFound(t *testing.T) {
+	a := newAdapter(t)
+
+	_, err := a.GetPanePID(context.Background(), uniqueSessionName(t))
+	if !errors.Is(err, domain.ErrTmuxSessionNotFound) {
+		t.Errorf("GetPanePID() unknown error = %v, want %v", err, domain.ErrTmuxSessionNotFound)
 	}
 }
