@@ -13,6 +13,9 @@ import (
 func TestDefault_ReturnsCorrectValues(t *testing.T) {
 	cfg := config.Default()
 
+	if cfg.Theme != "dark" {
+		t.Errorf("Theme: want dark, got %s", cfg.Theme)
+	}
 	if cfg.Dashboard.MinWidth != 60 {
 		t.Errorf("MinWidth: want 60, got %d", cfg.Dashboard.MinWidth)
 	}
@@ -59,6 +62,9 @@ func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
 	}
 
 	def := config.Default()
+	if cfg.Theme != def.Theme {
+		t.Errorf("Theme: want %s, got %s", def.Theme, cfg.Theme)
+	}
 	if cfg.Dashboard != def.Dashboard {
 		t.Errorf("Dashboard: want %+v, got %+v", def.Dashboard, cfg.Dashboard)
 	}
@@ -96,6 +102,44 @@ func TestLoad_InvalidYAML_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestLoad_ThemeKey_OverridesDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "theme: tokyo-night\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Theme != "tokyo-night" {
+		t.Errorf("Theme: want tokyo-night, got %s", cfg.Theme)
+	}
+}
+
+func TestLoad_ThemeOmitted_KeepsDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "logging:\n  level: debug\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Theme != "dark" {
+		t.Errorf("Theme: omitting field should preserve dark default, got %s", cfg.Theme)
+	}
+}
+
 func TestLoad_PartialYAML_FillsDefaults(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -125,7 +169,8 @@ func TestLoad_ValidFullConfig_AllFieldsSet(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 
-	content := `dashboard:
+	content := `theme: dracula
+dashboard:
   minWidth: 100
   minHeight: 30
 logging:
@@ -152,6 +197,9 @@ editors:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	if cfg.Theme != "dracula" {
+		t.Errorf("Theme: want dracula, got %s", cfg.Theme)
+	}
 	if cfg.Dashboard.MinWidth != 100 {
 		t.Errorf("MinWidth: want 100, got %d", cfg.Dashboard.MinWidth)
 	}

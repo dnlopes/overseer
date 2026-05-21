@@ -156,8 +156,14 @@ type Styles struct {
 	SessionDetails SessionDetailsStyles
 }
 
+// New builds *Styles using the dark theme; production code should use NewWithTheme.
 func New() *Styles {
-	theme := LoadTheme("dark")
+	return NewWithTheme("dark")
+}
+
+// NewWithTheme builds *Styles using the named theme; unknown names fall back to dark.
+func NewWithTheme(themeName string) *Styles {
+	theme := LoadTheme(themeName)
 
 	helpKeyStyle := lipgloss.NewStyle().Foreground(theme.Text).Background(theme.HelpBarBg).Bold(true)
 	helpBarStyle := lipgloss.NewStyle().Background(theme.HelpBarBg).Padding(0, 1)

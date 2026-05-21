@@ -86,3 +86,27 @@ func TestAllStyles_NonEmptyRender(t *testing.T) {
 		})
 	}
 }
+
+func TestNewWithTheme_ReturnsNonNil(t *testing.T) {
+	if styles.NewWithTheme("dracula") == nil {
+		t.Fatal("NewWithTheme(\"dracula\") returned nil")
+	}
+}
+
+func TestNewWithTheme_UnknownTheme_MatchesDarkOutput(t *testing.T) {
+	dark := styles.New()
+	unknown := styles.NewWithTheme("does-not-exist")
+
+	if dark.TitleBar.Branding.Render("X") != unknown.TitleBar.Branding.Render("X") {
+		t.Errorf("NewWithTheme with an unknown name should fall back to the dark theme, but TitleBar.Branding output differs")
+	}
+}
+
+func TestNewWithTheme_DifferentThemes_ProduceDifferentOutput(t *testing.T) {
+	dark := styles.NewWithTheme("dark")
+	dracula := styles.NewWithTheme("dracula")
+
+	if dark.TitleBar.Branding.Render("X") == dracula.TitleBar.Branding.Render("X") {
+		t.Error("dark and dracula themes produce identical TitleBar.Branding output; theme name is not being applied")
+	}
+}

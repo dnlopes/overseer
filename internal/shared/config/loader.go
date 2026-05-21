@@ -37,6 +37,7 @@ type EditorConfig struct {
 }
 
 type Config struct {
+	Theme     string           `yaml:"theme"`
 	Dashboard DashboardConfig  `yaml:"dashboard"`
 	Logging   LoggingConfig    `yaml:"logging"`
 	Storage   StorageConfig    `yaml:"storage"`
@@ -46,6 +47,7 @@ type Config struct {
 
 func Default() Config {
 	return Config{
+		Theme: "dark",
 		Dashboard: DashboardConfig{
 			MinWidth:  60,
 			MinHeight: 15,

@@ -89,7 +89,7 @@ func main() {
 	prJob := buildPullRequestJob(sessionSvc, projectSvc, prSvc)
 	scheduler := jobs.New(prJob)
 
-	s := styles.New()
+	s := styles.NewWithTheme(cfg.Theme)
 	dash := dashboard.New(s, *sessionSvc, *projectSvc, scheduler, launchers, editors, cfg.Dashboard.MinWidth, cfg.Dashboard.MinHeight)
 	p := tea.NewProgram(altScreenModel{inner: dash})
 
