@@ -21,8 +21,11 @@ import (
 const ListIndentUnit = 2
 
 type BorderStyles struct {
-	Focused lipgloss.Style
-	Blurred lipgloss.Style
+	Focused     lipgloss.Style
+	Blurred     lipgloss.Style
+	CharFocused lipgloss.Style
+	CharBlurred lipgloss.Style
+	Title       lipgloss.Style
 }
 
 type PaneStyles struct {
@@ -86,7 +89,6 @@ type TabStyles struct {
 }
 
 type SessionDetailsStyles struct {
-	Name    lipgloss.Style
 	Glyph   lipgloss.Style
 	Value   lipgloss.Style
 	Good    lipgloss.Style
@@ -103,7 +105,7 @@ type Styles struct {
 		Branding lipgloss.Style
 		Subtext  lipgloss.Style
 	}
-	Pane    PaneStyles
+	Pane PaneStyles
 	// ListRow describes the *appearance* of a row in any list/tree view —
 	// foreground, weight, selection background. It deliberately carries no
 	// padding or margin: spatial position (depth indent, prefixes) is the
@@ -164,6 +166,9 @@ func New() *Styles {
 			Blurred: lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(theme.Border),
+			CharFocused: lipgloss.NewStyle().Foreground(theme.BorderFocus),
+			CharBlurred: lipgloss.NewStyle().Foreground(theme.Border),
+			Title:       lipgloss.NewStyle().Foreground(theme.Text).Bold(true),
 		},
 		TitleBar: struct {
 			Base     lipgloss.Style
@@ -291,7 +296,6 @@ func New() *Styles {
 			Bar:      lipgloss.NewStyle().Foreground(theme.Border),
 		},
 		SessionDetails: SessionDetailsStyles{
-			Name:    lipgloss.NewStyle().Foreground(theme.Text).Bold(true),
 			Glyph:   lipgloss.NewStyle().Foreground(theme.Muted),
 			Value:   lipgloss.NewStyle().Foreground(theme.Text),
 			Good:    lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),

@@ -26,8 +26,6 @@ func (m Model) renderContent(width int) string {
 	}
 
 	var sections [][]string
-	sections = append(sections, []string{m.renderName(width)})
-
 	if m.session.HasWorktree() {
 		sections = append(sections, m.renderPRSection(width))
 		sections = append(sections, m.renderWorktreeSection(width))
@@ -48,10 +46,6 @@ func joinSections(sections [][]string) string {
 		parts = append(parts, sec...)
 	}
 	return strings.Join(parts, "\n")
-}
-
-func (m Model) renderName(width int) string {
-	return m.styles.SessionDetails.Name.Render(truncate(m.session.Name, width))
 }
 
 func (m Model) renderPRSection(width int) []string {

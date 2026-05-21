@@ -78,5 +78,5 @@ func (m Model) View() tea.View {
 	}
 	innerW, _ := components.PanelInnerSize(m.styles, false, m.width, m.height)
 	content := m.renderContent(innerW)
-	return components.PanelWithSize(m.styles, content, false, m.width, m.height)
+	return components.PanelWithTitle(m.styles, content, "Session details", false, m.width, m.height)
 }

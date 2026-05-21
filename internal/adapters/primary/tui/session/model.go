@@ -233,7 +233,7 @@ func (m Model) findSession(id string) (domain.Session, bool) {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	innerW, innerH := components.PanelInnerSize(m.styles, m.focused, width, height)
+	innerW, innerH := components.TitledPanelInnerSize(m.styles, m.focused, width, height)
 	m.tree = m.tree.SetSize(innerW, innerH)
 }
 
@@ -268,7 +268,7 @@ func (m Model) View() tea.View {
 			m.styles.EmptyState.Hint.Render("Press n to create one"),
 		}, "\n")
 	}
-	return components.PanelWithSize(m.styles, content, m.focused, m.width, m.height)
+	return components.PanelWithTitle(m.styles, content, "Sessions", m.focused, m.width, m.height)
 }
 
 func (m Model) loadSessions() tea.Cmd {
