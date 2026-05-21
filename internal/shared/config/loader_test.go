@@ -40,11 +40,11 @@ func TestDefault_ShipsOpencodeAndClaudeLaunchers(t *testing.T) {
 	if len(cfg.Launchers) != 2 {
 		t.Fatalf("Launchers: want 2 entries, got %d", len(cfg.Launchers))
 	}
-	if cfg.Launchers[0].DisplayName != "OpenCode" || cfg.Launchers[0].Command != "opencode" {
-		t.Errorf("Launchers[0]: want {OpenCode, opencode}, got %+v", cfg.Launchers[0])
+	if cfg.Launchers[0].DisplayName != "OpenCode (default)" || cfg.Launchers[0].Command != "opencode" {
+		t.Errorf("Launchers[0]: want {OpenCode (default), opencode}, got %+v", cfg.Launchers[0])
 	}
-	if cfg.Launchers[1].DisplayName != "Claude Code" || cfg.Launchers[1].Command != "claude" {
-		t.Errorf("Launchers[1]: want {Claude Code, claude}, got %+v", cfg.Launchers[1])
+	if cfg.Launchers[1].DisplayName != "Claude Code (default)" || cfg.Launchers[1].Command != "claude" {
+		t.Errorf("Launchers[1]: want {Claude Code (default), claude}, got %+v", cfg.Launchers[1])
 	}
 }
 
@@ -54,8 +54,8 @@ func TestDefault_ShipsVSCodeEditor(t *testing.T) {
 	if len(cfg.Editors) != 1 {
 		t.Fatalf("Editors: want 1 entry, got %d", len(cfg.Editors))
 	}
-	if cfg.Editors[0].DisplayName != "VSCode" || cfg.Editors[0].Command != "code" {
-		t.Errorf("Editors[0]: want {VSCode, code}, got %+v", cfg.Editors[0])
+	if cfg.Editors[0].DisplayName != "VSCode (default)" || cfg.Editors[0].Command != "code" {
+		t.Errorf("Editors[0]: want {VSCode (default), code}, got %+v", cfg.Editors[0])
 	}
 }
 
@@ -219,11 +219,11 @@ editors:
 	if len(cfg.Launchers) != 4 {
 		t.Fatalf("Launchers: want 4 entries, got %d", len(cfg.Launchers))
 	}
-	if cfg.Launchers[0].DisplayName != "OpenCode" || cfg.Launchers[0].Command != "opencode" {
-		t.Errorf("Launchers[0]: want {OpenCode, opencode}, got %+v", cfg.Launchers[0])
+	if cfg.Launchers[0].DisplayName != "OpenCode (default)" || cfg.Launchers[0].Command != "opencode" {
+		t.Errorf("Launchers[0]: want {OpenCode (default), opencode}, got %+v", cfg.Launchers[0])
 	}
-	if cfg.Launchers[1].DisplayName != "Claude Code" || cfg.Launchers[1].Command != "claude" {
-		t.Errorf("Launchers[1]: want {Claude Code, claude}, got %+v", cfg.Launchers[1])
+	if cfg.Launchers[1].DisplayName != "Claude Code (default)" || cfg.Launchers[1].Command != "claude" {
+		t.Errorf("Launchers[1]: want {Claude Code (default), claude}, got %+v", cfg.Launchers[1])
 	}
 	if cfg.Launchers[2].DisplayName != "Custom Agent" || cfg.Launchers[2].Command != "my-agent --foo" {
 		t.Errorf("Launchers[2]: want {Custom Agent, my-agent --foo}, got %+v", cfg.Launchers[2])
@@ -234,8 +234,8 @@ editors:
 	if len(cfg.Editors) != 3 {
 		t.Fatalf("Editors: want 3 entries, got %d", len(cfg.Editors))
 	}
-	if cfg.Editors[0].DisplayName != "VSCode" || cfg.Editors[0].Command != "code" {
-		t.Errorf("Editors[0]: want {VSCode, code}, got %+v", cfg.Editors[0])
+	if cfg.Editors[0].DisplayName != "VSCode (default)" || cfg.Editors[0].Command != "code" {
+		t.Errorf("Editors[0]: want {VSCode (default), code}, got %+v", cfg.Editors[0])
 	}
 	if cfg.Editors[1].DisplayName != "Cursor" || cfg.Editors[1].Command != "cursor" {
 		t.Errorf("Editors[1]: want {Cursor, cursor}, got %+v", cfg.Editors[1])
