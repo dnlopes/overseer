@@ -53,13 +53,9 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case shared.SessionSelectedMsg:
-		sessID, err := uuid.Parse(msg.ID)
-		if err != nil {
-			sessID = uuid.Nil
-		}
-		m.sessionID = sessID
+		m.sessionID = msg.Session.ID
 		for i := range m.views {
-			m.views[i].SetSession(sessID)
+			m.views[i].SetSession(msg.Session.ID)
 		}
 		return m, m.views[m.activeIx].Init()
 

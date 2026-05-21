@@ -11,7 +11,7 @@ import (
 
 type SessionCreatedMsg struct{ Session domain.Session }
 
-type SessionSelectedMsg struct{ ID string }
+type SessionSelectedMsg struct{ Session domain.Session }
 
 type SessionsLoadedMsg struct {
 	Sessions []domain.Session

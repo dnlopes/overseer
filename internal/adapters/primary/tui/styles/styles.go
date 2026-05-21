@@ -21,8 +21,11 @@ import (
 const ListIndentUnit = 2
 
 type BorderStyles struct {
-	Focused lipgloss.Style
-	Blurred lipgloss.Style
+	Focused     lipgloss.Style
+	Blurred     lipgloss.Style
+	CharFocused lipgloss.Style
+	CharBlurred lipgloss.Style
+	Title       lipgloss.Style
 }
 
 type PaneStyles struct {
@@ -85,6 +88,16 @@ type TabStyles struct {
 	Bar      lipgloss.Style
 }
 
+type SessionDetailsStyles struct {
+	Glyph   lipgloss.Style
+	Value   lipgloss.Style
+	Good    lipgloss.Style
+	Bad     lipgloss.Style
+	Warn    lipgloss.Style
+	Special lipgloss.Style
+	Hint    lipgloss.Style
+}
+
 type Styles struct {
 	Border   BorderStyles
 	TitleBar struct {
@@ -92,7 +105,7 @@ type Styles struct {
 		Branding lipgloss.Style
 		Subtext  lipgloss.Style
 	}
-	Pane    PaneStyles
+	Pane PaneStyles
 	// ListRow describes the *appearance* of a row in any list/tree view —
 	// foreground, weight, selection background. It deliberately carries no
 	// padding or margin: spatial position (depth indent, prefixes) is the
@@ -131,11 +144,12 @@ type Styles struct {
 	Divider struct {
 		Horizontal lipgloss.Style
 	}
-	Help       HelpStyles
-	EmptyState EmptyStateStyles
-	TooSmall   TooSmallStyles
-	Layout     LayoutStyles
-	Tab        TabStyles
+	Help           HelpStyles
+	EmptyState     EmptyStateStyles
+	TooSmall       TooSmallStyles
+	Layout         LayoutStyles
+	Tab            TabStyles
+	SessionDetails SessionDetailsStyles
 }
 
 func New() *Styles {
@@ -152,6 +166,9 @@ func New() *Styles {
 			Blurred: lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(theme.Border),
+			CharFocused: lipgloss.NewStyle().Foreground(theme.BorderFocus),
+			CharBlurred: lipgloss.NewStyle().Foreground(theme.Border),
+			Title:       lipgloss.NewStyle().Foreground(theme.Text).Bold(true),
 		},
 		TitleBar: struct {
 			Base     lipgloss.Style
@@ -277,6 +294,15 @@ func New() *Styles {
 			Active:   lipgloss.NewStyle().Foreground(theme.TitleText).Background(theme.Primary).Bold(true).Padding(0, 2),
 			Inactive: lipgloss.NewStyle().Foreground(theme.Subtext).Padding(0, 2),
 			Bar:      lipgloss.NewStyle().Foreground(theme.Border),
+		},
+		SessionDetails: SessionDetailsStyles{
+			Glyph:   lipgloss.NewStyle().Foreground(theme.Muted),
+			Value:   lipgloss.NewStyle().Foreground(theme.Text),
+			Good:    lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),
+			Bad:     lipgloss.NewStyle().Foreground(theme.Danger).Bold(true),
+			Warn:    lipgloss.NewStyle().Foreground(theme.Warning).Bold(true),
+			Special: lipgloss.NewStyle().Foreground(theme.Primary).Bold(true),
+			Hint:    lipgloss.NewStyle().Foreground(theme.Subtext).Italic(true),
 		},
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/jobs"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/leftpane"
 	sessionui "github.com/dnlopes/overseer/internal/adapters/primary/tui/session"
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/sessiondetails"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	"github.com/dnlopes/overseer/internal/core/domain"
@@ -68,7 +69,8 @@ func New(
 	minWidth, minHeight int,
 ) Model {
 	sessionsModel := sessionui.New(styles, sessionsService)
-	left := leftpane.New(styles, sessionsModel)
+	detailsModel := sessiondetails.New(styles)
+	left := leftpane.New(styles, sessionsModel, detailsModel)
 	left.SetFocus(true)
 	m := Model{
 		styles:          styles,
@@ -159,7 +161,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case shared.PRStatusUpdatedMsg:
 		m.prStatuses[msg.SessionID] = msg
-		return m, nil
+		var cmd tea.Cmd
+		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
+		return m, cmd
 	}
 
 	if m.activePopup != popupNone {

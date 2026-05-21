@@ -8,6 +8,7 @@ import (
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
+	"github.com/dnlopes/overseer/internal/core/domain"
 	"github.com/dnlopes/overseer/internal/core/service"
 )
 
@@ -59,7 +60,7 @@ func TestInspector_PrevKey_CyclesBackward(t *testing.T) {
 func TestInspector_SessionSelectedMsg_PropagatesToAllViews(t *testing.T) {
 	m := newTestModel(t)
 	id := uuid.New()
-	updated, _ := m.Update(shared.SessionSelectedMsg{ID: id.String()})
+	updated, _ := m.Update(shared.SessionSelectedMsg{Session: domain.Session{ID: id}})
 	m = updated.(Model)
 	if m.sessionID != id {
 		t.Errorf("model sessionID = %v, want %v", m.sessionID, id)
@@ -71,24 +72,6 @@ func TestInspector_SessionSelectedMsg_PropagatesToAllViews(t *testing.T) {
 		}
 		if sv.sessionID != id {
 			t.Errorf("view[%d] sessionID = %v, want %v", i, sv.sessionID, id)
-		}
-	}
-}
-
-func TestInspector_SessionSelectedMsg_InvalidID_ResetsToNil(t *testing.T) {
-	m := newTestModel(t)
-	for i := range m.views {
-		m.views[i].SetSession(uuid.New())
-	}
-	updated, _ := m.Update(shared.SessionSelectedMsg{ID: "not-a-uuid"})
-	m = updated.(Model)
-	if m.sessionID != uuid.Nil {
-		t.Errorf("model sessionID = %v, want Nil", m.sessionID)
-	}
-	for i, v := range m.views {
-		sv := v.(*streamView)
-		if sv.sessionID != uuid.Nil {
-			t.Errorf("view[%d] sessionID = %v, want Nil", i, sv.sessionID)
 		}
 	}
 }
