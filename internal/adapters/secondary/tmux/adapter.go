@@ -144,12 +144,19 @@ func (a *Adapter) AttachCommand(_ context.Context, tmuxID string) (*exec.Cmd, er
 // named tmux session. The `-e` flag preserves ANSI escape sequences so callers
 // can render the output with its original colors. "can't find session" stderr
 // is mapped to domain.ErrTmuxSessionNotFound by the run helper.
+//
+// tmux capture-pane terminates every visible row with "\n", so an N-row pane
+// always yields a string with N trailing newlines. Lipgloss counts that as
+// N+1 lines (`strings.Count("\n") + 1`), which makes any panel sized to the
+// pane's height overflow by one row and push the help bar off-screen. We
+// strip exactly one trailing newline here so callers see content whose
+// rendered height matches the pane's actual row count.
 func (a *Adapter) CapturePane(_ context.Context, tmuxID string) (string, error) {
 	stdout, err := a.run("capture-pane", "-p", "-e", "-t", "="+tmuxID+":")
 	if err != nil {
 		return "", fmt.Errorf("tmux: capture pane %q: %w", tmuxID, err)
 	}
-	return stdout, nil
+	return strings.TrimSuffix(stdout, "\n"), nil
 }
 
 // ResizeWindow resizes the named tmux session's window to width×height cells.

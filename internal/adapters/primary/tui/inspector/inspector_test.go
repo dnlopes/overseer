@@ -1,9 +1,11 @@
 package inspector
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/google/uuid"
 
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
@@ -106,6 +108,32 @@ func TestInspector_PreviewCapturedMsg_OnlyActiveViewProcesses(t *testing.T) {
 	shell := m.views[1].(*streamView)
 	if shell.content != "" {
 		t.Errorf("shell received agent-kind message: content = %q, want empty", shell.content)
+	}
+}
+
+func TestInspector_View_HeightStaysWithinDeclaredSizeWhenStreaming(t *testing.T) {
+	const width, height = 80, 20
+
+	m := newTestModel(t)
+	m.SetSize(width, height)
+
+	id := uuid.New()
+	updated, _ := m.Update(shared.SessionSelectedMsg{Session: domain.Session{ID: id}})
+	m = updated.(Model)
+
+	innerH := height - tabStripHeight - 2
+	streamingContent := strings.Repeat("agent-output-row\n", innerH+3)
+	updated, _ = m.Update(previewCapturedMsg{
+		kind:         viewKindAgent,
+		sessionID:    id,
+		content:      streamingContent,
+		sessionReady: true,
+	})
+	m = updated.(Model)
+
+	out := m.View().Content
+	if got := lipgloss.Height(out); got != height {
+		t.Errorf("Inspector.View() height with streaming content = %d, want %d (must not overflow declared height — overflow pushes dashboard help bar off-screen and breaks pane-height symmetry)", got, height)
 	}
 }
 

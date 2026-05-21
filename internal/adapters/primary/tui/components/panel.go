@@ -26,9 +26,21 @@ func PanelWithSize(s *styles.Styles, content string, focused bool, width, height
 	// padding. To make the container fill the border interior exactly
 	// (no gap on the right), its width must be (width - borderW); the
 	// content area inside the container is then PanelInnerSize.
+	//
+	// Height(N) only pads short content up to N; it does NOT truncate
+	// taller content (see lipgloss/align.go alignTextVertical). MaxHeight
+	// is the only setting that clamps. Apply it to the container (before
+	// the border) so an overflowing child cannot grow the panel past its
+	// declared height — that would push the help bar off-screen and break
+	// the dashboard's vertical layout. MaxHeight on the border itself
+	// would clip the bottom border row, so we cap the inner content and
+	// let the border wrap a guaranteed-correct-height block.
 	containerOuterW := max(width-borderW, 0)
 	containerOuterH := max(height-borderH, 0)
-	content = s.Pane.Container.Width(containerOuterW).Height(containerOuterH).Render(content)
+	content = s.Pane.Container.
+		Width(containerOuterW).Height(containerOuterH).
+		MaxHeight(containerOuterH).
+		Render(content)
 	return tea.NewView(border.Width(width).Height(height).Render(content))
 }
 
@@ -89,6 +101,7 @@ func PanelWithTitle(s *styles.Styles, content, title string, focused bool, width
 	padded := s.Pane.Container.
 		PaddingBottom(titledPanelPaddingBottom).
 		Width(containerOuterW).Height(containerOuterH).
+		MaxHeight(containerOuterH).
 		Render(content)
 
 	chars := lipgloss.RoundedBorder()

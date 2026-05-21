@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 )
@@ -49,5 +51,47 @@ func TestPanel_ContentVisible(t *testing.T) {
 
 	if !strings.Contains(out, content) {
 		t.Errorf("Panel output missing content %q, got: %q", content, out)
+	}
+}
+
+func TestPanelWithSize_ClampsOverflowingContentToDeclaredHeight(t *testing.T) {
+	s := styles.New()
+	const width, height = 20, 6
+
+	tallContent := strings.Repeat("row\n", height+5)
+	out := components.PanelWithSize(s, tallContent, true, width, height).Content
+
+	if got := lipgloss.Height(out); got != height {
+		t.Errorf("PanelWithSize height = %d, want %d (panel must not grow past declared height even when content overflows)", got, height)
+	}
+}
+
+func TestPanelWithSize_PreservesBottomBorderWhenContentOverflows(t *testing.T) {
+	s := styles.New()
+	const width, height = 20, 6
+
+	tallContent := strings.Repeat("row\n", height+5)
+	out := components.PanelWithSize(s, tallContent, true, width, height).Content
+
+	lines := strings.Split(out, "\n")
+	if len(lines) == 0 {
+		t.Fatalf("PanelWithSize produced no output")
+	}
+	last := lines[len(lines)-1]
+	if !strings.ContainsRune(last, '╰') || !strings.ContainsRune(last, '╯') {
+		t.Errorf("PanelWithSize last row missing bottom border corners (╰╯), got: %q\nfull output:\n%s", last, out)
+	}
+}
+
+func TestPanelWithSize_TmuxLikeContentDoesNotOverflow(t *testing.T) {
+	s := styles.New()
+	const width, height = 20, 6
+
+	containerOuterH := height - 2
+	tmuxLike := strings.Repeat("line\n", containerOuterH)
+	out := components.PanelWithSize(s, tmuxLike, true, width, height).Content
+
+	if got := lipgloss.Height(out); got != height {
+		t.Errorf("PanelWithSize height with tmux-style trailing-newline content = %d, want %d", got, height)
 	}
 }

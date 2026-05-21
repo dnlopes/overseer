@@ -220,6 +220,34 @@ func TestIntegration_Adapter_CapturePane_UnknownReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestIntegration_Adapter_CapturePane_LineCountMatchesPaneHeight(t *testing.T) {
+	a := newAdapter(t)
+	ctx := context.Background()
+	name := uniqueSessionName(t)
+
+	tmuxID, err := a.CreateSession(ctx, name, "", "tail -f /dev/null")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	t.Cleanup(func() { _ = a.KillSession(ctx, tmuxID) })
+
+	const paneWidth, paneHeight = 30, 5
+	if err := a.ResizeWindow(ctx, tmuxID, paneWidth, paneHeight); err != nil {
+		t.Fatalf("ResizeWindow() error = %v", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+	got, err := a.CapturePane(ctx, tmuxID)
+	if err != nil {
+		t.Fatalf("CapturePane() error = %v", err)
+	}
+
+	gotLines := strings.Count(got, "\n") + 1
+	if gotLines != paneHeight {
+		t.Errorf("CapturePane() lipgloss-counted lines = %d, want %d (pane height). Raw tmux output has N trailing newlines for an N-row pane which lipgloss counts as N+1 — adapter must strip exactly one trailing \\n so panels sized to the pane height do not overflow. Got: %q", gotLines, paneHeight, got)
+	}
+}
+
 func TestIntegration_Adapter_ResizeWindow_AppliesAndPreservesAutoSizing(t *testing.T) {
 	a := newAdapter(t)
 	ctx := context.Background()
