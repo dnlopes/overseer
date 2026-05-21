@@ -36,11 +36,12 @@ type TreeNode[T any] struct {
 
 // TreeRenderFunc lets callers control how each item is displayed.
 // Receives the item, its zero-based row index (across visible rows),
-// indentation depth, the row width (from the tree's SetSize), whether
-// it has children, whether it's currently expanded, and whether the
-// cursor is on it. Renderers that want right-aligned accessory text
-// (e.g. timestamps) need width to compute the padding; renderers that
-// don't care can ignore it.
+// indentation depth, the row width in cells (the tree's configured
+// width from SetSize), whether it has children, whether it's currently
+// expanded, and whether the cursor is on it. The width parameter lets
+// renderers compose right-aligned accessory columns (e.g. timestamps,
+// status badges) without querying the tree model separately; renderers
+// that don't care can ignore it.
 type TreeRenderFunc[T any] func(item T, index, depth, width int, hasKids, expanded, focused bool) string
 
 // TreeSelectMsg is emitted whenever the cursor lands on a different node,

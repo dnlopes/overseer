@@ -470,3 +470,184 @@ func TestDomainEditors_InvalidEntry_ReturnsInvalidInput(t *testing.T) {
 		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
 	}
 }
+
+func TestDefault_ShipsFiveBuiltInLabels(t *testing.T) {
+	cfg := config.Default()
+
+	wantCodes := []string{"WIP", "reviewing", "ready", "done", "draft"}
+	if len(cfg.Labels) != len(wantCodes) {
+		t.Fatalf("Labels: want %d entries, got %d", len(wantCodes), len(cfg.Labels))
+	}
+	for i, want := range wantCodes {
+		if cfg.Labels[i].Code != want {
+			t.Errorf("Labels[%d].Code = %q, want %q", i, cfg.Labels[i].Code, want)
+		}
+		if cfg.Labels[i].Color == "" {
+			t.Errorf("Labels[%d].Color is empty", i)
+		}
+		if cfg.Labels[i].Glyph == "" {
+			t.Errorf("Labels[%d].Glyph is empty, want non-empty default glyph", i)
+		}
+	}
+}
+
+func TestLoad_LabelsKey_ReplacesDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := `labels:
+  - code: in-progress
+    color: "#ff00ff"
+    glyph: "🔥"
+  - code: blocked
+    color: red
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.Labels) != 2 {
+		t.Fatalf("Labels: want 2 entries (full replacement), got %d", len(cfg.Labels))
+	}
+	if cfg.Labels[0].Code != "in-progress" || cfg.Labels[0].Color != "#ff00ff" || cfg.Labels[0].Glyph != "🔥" {
+		t.Errorf("Labels[0] = %+v, want {in-progress, #ff00ff, 🔥}", cfg.Labels[0])
+	}
+	if cfg.Labels[1].Code != "blocked" || cfg.Labels[1].Color != "red" || cfg.Labels[1].Glyph != "" {
+		t.Errorf("Labels[1] = %+v, want {blocked, red, \"\"} (glyph omitted)", cfg.Labels[1])
+	}
+}
+
+func TestLoad_LabelsOmitted_KeepsDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "theme: dark\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.Labels) != 5 {
+		t.Fatalf("Labels: omitting field should preserve 5 defaults, got %d", len(cfg.Labels))
+	}
+	if cfg.Labels[0].Code != "WIP" {
+		t.Errorf("Labels[0].Code = %q, want %q", cfg.Labels[0].Code, "WIP")
+	}
+}
+
+func TestLoad_LabelsEmptyList_ClearsAllLabels(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "labels: []\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.Labels) != 0 {
+		t.Fatalf("Labels: explicit empty list should clear defaults, got %d entries", len(cfg.Labels))
+	}
+}
+
+func TestValidate_LabelInvalidCode_ReturnsInvalidInput(t *testing.T) {
+	cfg := config.Default()
+	cfg.Labels = []config.LabelConfig{
+		{Code: "", Color: "#fff"},
+	}
+
+	err := cfg.Validate()
+
+	if err == nil {
+		t.Fatal("Validate() error = nil, want error for empty label code")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("Validate() error = %v, want ErrInvalidInput", err)
+	}
+}
+
+func TestValidate_LabelInvalidColor_ReturnsInvalidInput(t *testing.T) {
+	cfg := config.Default()
+	cfg.Labels = []config.LabelConfig{
+		{Code: "WIP", Color: ""},
+	}
+
+	err := cfg.Validate()
+
+	if err == nil {
+		t.Fatal("Validate() error = nil, want error for empty label color")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("Validate() error = %v, want ErrInvalidInput", err)
+	}
+}
+
+func TestValidate_LabelDuplicateCodes_ReturnsInvalidInput(t *testing.T) {
+	cfg := config.Default()
+	cfg.Labels = []config.LabelConfig{
+		{Code: "WIP", Color: "#f00"},
+		{Code: "WIP", Color: "#0f0"},
+	}
+
+	err := cfg.Validate()
+
+	if err == nil {
+		t.Fatal("Validate() error = nil, want error for duplicate label codes")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("Validate() error = %v, want ErrInvalidInput", err)
+	}
+}
+
+func TestDomainLabels_BuildsValidatedDomainObjects(t *testing.T) {
+	cfg := config.Config{
+		Labels: []config.LabelConfig{
+			{Code: "WIP", Color: "#F59E0B", Glyph: "🚧"},
+			{Code: "ready", Color: "#60A5FA"},
+		},
+	}
+
+	got, err := cfg.DomainLabels()
+	if err != nil {
+		t.Fatalf("DomainLabels() error = %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("DomainLabels() len = %d, want 2", len(got))
+	}
+	if got[0].Code != "WIP" || got[0].Color != "#F59E0B" || got[0].Glyph != "🚧" {
+		t.Errorf("DomainLabels()[0] = %+v, want {WIP, #F59E0B, 🚧}", got[0])
+	}
+	if got[1].Code != "ready" || got[1].Color != "#60A5FA" || got[1].Glyph != "" {
+		t.Errorf("DomainLabels()[1] = %+v, want {ready, #60A5FA, \"\"}", got[1])
+	}
+}
+
+func TestDomainLabels_InvalidEntry_ReturnsInvalidInput(t *testing.T) {
+	cfg := config.Config{
+		Labels: []config.LabelConfig{
+			{Code: "OK", Color: "#000"},
+			{Code: "", Color: "#fff"},
+		},
+	}
+
+	_, err := cfg.DomainLabels()
+	if err == nil {
+		t.Fatal("DomainLabels() error = nil, want error for empty code")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("DomainLabels() error = %v, want ErrInvalidInput", err)
+	}
+}

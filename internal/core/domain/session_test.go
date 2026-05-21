@@ -391,3 +391,80 @@ func TestRename_TrimsAndValidates(t *testing.T) {
 		}
 	})
 }
+
+func TestAssignLabel_StoresAndUpdatesTimestamp(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	originalUpdated := s.UpdatedAt
+	time.Sleep(time.Millisecond)
+
+	if err := s.AssignLabel("WIP"); err != nil {
+		t.Fatalf("AssignLabel() error = %v", err)
+	}
+	if s.Label != "WIP" {
+		t.Fatalf("Label = %q, want %q", s.Label, "WIP")
+	}
+	if !s.UpdatedAt.After(originalUpdated) {
+		t.Fatalf("UpdatedAt = %v, want after %v", s.UpdatedAt, originalUpdated)
+	}
+}
+
+func TestAssignLabel_TrimsCode(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+
+	if err := s.AssignLabel("  reviewing  "); err != nil {
+		t.Fatalf("AssignLabel() error = %v", err)
+	}
+	if s.Label != "reviewing" {
+		t.Fatalf("Label = %q, want trimmed %q", s.Label, "reviewing")
+	}
+}
+
+func TestAssignLabel_EmptyCodeClears(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	_ = s.AssignLabel("done")
+	if s.Label != "done" {
+		t.Fatalf("precondition: Label = %q, want %q", s.Label, "done")
+	}
+
+	if err := s.AssignLabel(""); err != nil {
+		t.Fatalf("AssignLabel(\"\") error = %v, want nil (clear)", err)
+	}
+	if s.Label != "" {
+		t.Fatalf("Label = %q, want empty after clear", s.Label)
+	}
+}
+
+func TestAssignLabel_BlankCodeClears(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	_ = s.AssignLabel("done")
+
+	if err := s.AssignLabel("   "); err != nil {
+		t.Fatalf("AssignLabel(\"   \") error = %v, want nil (clear)", err)
+	}
+	if s.Label != "" {
+		t.Fatalf("Label = %q, want empty (blank trims to empty)", s.Label)
+	}
+}
+
+func TestAssignLabel_RejectsTooLong(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	tooLong := strings.Repeat("a", 51)
+
+	err := s.AssignLabel(tooLong)
+
+	if !errors.Is(err, ErrSessionLabelTooLong) {
+		t.Fatalf("AssignLabel(too-long) error = %v, want %v", err, ErrSessionLabelTooLong)
+	}
+}
+
+func TestAssignLabel_DoesNotBumpTimestampOnError(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	originalUpdated := s.UpdatedAt
+	time.Sleep(time.Millisecond)
+
+	_ = s.AssignLabel(strings.Repeat("a", 51))
+
+	if !s.UpdatedAt.Equal(originalUpdated) {
+		t.Fatalf("UpdatedAt = %v, want unchanged %v after rejected assignment", s.UpdatedAt, originalUpdated)
+	}
+}

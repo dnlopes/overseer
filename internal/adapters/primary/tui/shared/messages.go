@@ -26,6 +26,12 @@ type SessionReorderedMsg struct {
 	Err      error
 }
 
+type SessionLabelCycledMsg struct {
+	Sessions []domain.Session
+	FocusID  string
+	Err      error
+}
+
 type NewSessionPopupCloseMsg struct{}
 
 type SessionCreateErrMsg struct{ Err error }

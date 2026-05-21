@@ -36,6 +36,12 @@ type EditorConfig struct {
 	Command     string `yaml:"command"`
 }
 
+type LabelConfig struct {
+	Code  string `yaml:"code"`
+	Color string `yaml:"color"`
+	Glyph string `yaml:"glyph"`
+}
+
 type Config struct {
 	Theme     string           `yaml:"theme"`
 	Dashboard DashboardConfig  `yaml:"dashboard"`
@@ -43,6 +49,7 @@ type Config struct {
 	Storage   StorageConfig    `yaml:"storage"`
 	Launchers []LauncherConfig `yaml:"launchers"`
 	Editors   []EditorConfig   `yaml:"editors"`
+	Labels    []LabelConfig    `yaml:"labels"`
 }
 
 func Default() Config {
@@ -61,7 +68,16 @@ func Default() Config {
 		Editors: []EditorConfig{
 			{DisplayName: "VSCode", Command: "code"},
 		},
+		Labels: defaultLabelConfigs(),
 	}
+}
+
+func defaultLabelConfigs() []LabelConfig {
+	out := make([]LabelConfig, len(domain.DefaultLabels))
+	for i, l := range domain.DefaultLabels {
+		out[i] = LabelConfig{Code: l.Code, Color: l.Color, Glyph: l.Glyph}
+	}
+	return out
 }
 
 func Load(path string) (Config, error) {
@@ -116,6 +132,18 @@ func (c Config) Validate() error {
 		}
 	}
 
+	seenLabelCodes := make(map[string]struct{}, len(c.Labels))
+	for i, l := range c.Labels {
+		label, err := domain.NewLabel(l.Code, l.Color, l.Glyph)
+		if err != nil {
+			return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: labels[%d]: %v", i, err))
+		}
+		if _, dup := seenLabelCodes[label.Code]; dup {
+			return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: labels[%d]: duplicate code %q", i, label.Code))
+		}
+		seenLabelCodes[label.Code] = struct{}{}
+	}
+
 	return nil
 }
 
@@ -160,6 +188,22 @@ func (c Config) DomainEditors() ([]domain.Editor, error) {
 			return nil, errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: editors[%d]: %v", i, err))
 		}
 		out = append(out, editor)
+	}
+	return out, nil
+}
+
+// DomainLabels wraps each entry in errs.ErrInvalidInput on failure so
+// callers can use errors.Is (same contract as Validate). Duplicate-code
+// detection lives in Validate, not here — DomainLabels assumes Validate
+// has already run.
+func (c Config) DomainLabels() ([]domain.Label, error) {
+	out := make([]domain.Label, 0, len(c.Labels))
+	for i, l := range c.Labels {
+		label, err := domain.NewLabel(l.Code, l.Color, l.Glyph)
+		if err != nil {
+			return nil, errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: labels[%d]: %v", i, err))
+		}
+		out = append(out, label)
 	}
 	return out, nil
 }

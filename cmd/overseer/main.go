@@ -62,6 +62,12 @@ func main() {
 		defaultEditor = editors[0]
 	}
 
+	labels, err := cfg.DomainLabels()
+	if err != nil {
+		log.Error("resolve labels", "error", err)
+		os.Exit(1)
+	}
+
 	store, err := storage.New(resolver.DataFile(), log)
 	if err != nil {
 		log.Error("initialize storage", "error", err)
@@ -90,7 +96,7 @@ func main() {
 	scheduler := jobs.New(prJob)
 
 	s := styles.NewWithTheme(cfg.Theme)
-	dash := dashboard.New(s, *sessionSvc, *projectSvc, scheduler, launchers, editors, cfg.Dashboard.MinWidth, cfg.Dashboard.MinHeight)
+	dash := dashboard.New(s, *sessionSvc, *projectSvc, scheduler, launchers, editors, labels, cfg.Dashboard.MinWidth, cfg.Dashboard.MinHeight)
 	p := tea.NewProgram(altScreenModel{inner: dash})
 
 	if _, err := p.Run(); err != nil {

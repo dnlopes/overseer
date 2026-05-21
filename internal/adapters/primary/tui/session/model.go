@@ -35,15 +35,17 @@ const (
 )
 
 type sessionNode struct {
-	kind      sessionNodeKind
-	sessionID string
-	label     string
-	updatedAt time.Time
+	kind       sessionNodeKind
+	sessionID  string
+	label      string
+	statusCode string
+	updatedAt  time.Time
 }
 
 type Model struct {
 	sessions     []domain.Session
 	projectNames map[uuid.UUID]string
+	labels       []domain.Label
 	groupingMode sessionGroupingMode
 	styles       *styles.Styles
 	service      service.SessionService
@@ -54,11 +56,12 @@ type Model struct {
 	err          error
 }
 
-func New(s *styles.Styles, service service.SessionService) Model {
-	tree := components.NewTree(renderSessionNode(s))
+func New(s *styles.Styles, service service.SessionService, labels []domain.Label) Model {
+	tree := components.NewTree(renderSessionNode(s, labels))
 	return Model{
 		styles:       s,
 		service:      service,
+		labels:       labels,
 		tree:         tree,
 		groupingMode: sessionGroupingProject,
 		projectNames: map[uuid.UUID]string{},
@@ -94,6 +97,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tree = m.tree.SelectID("session:" + first.ID.String())
 		return m, shared.Emit(shared.SessionSelectedMsg{Session: first})
 	case shared.SessionReorderedMsg:
+		if msg.Err != nil {
+			return m, nil
+		}
+		m.sessions = msg.Sessions
+		m.rebuildTree()
+		if msg.FocusID != "" {
+			if sess, ok := m.findSession(msg.FocusID); ok {
+				m.tree = m.tree.SelectID("session:" + msg.FocusID)
+				return m, shared.Emit(shared.SessionSelectedMsg{Session: sess})
+			}
+		}
+		return m, nil
+	case shared.SessionLabelCycledMsg:
 		if msg.Err != nil {
 			return m, nil
 		}
@@ -157,6 +173,11 @@ func (m *Model) handleNavigationKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 			return cmd, true
 		}
 		return nil, true
+	case key.Matches(msg, cycleLabelKeyBinding):
+		if cmd := m.cycleLabelSelected(); cmd != nil {
+			return cmd, true
+		}
+		return nil, true
 	}
 	return nil, false
 }
@@ -176,6 +197,34 @@ func (m Model) requestDeleteSelected() tea.Cmd {
 		}
 	}
 	return nil
+}
+
+func (m Model) cycleLabelSelected() tea.Cmd {
+	cur, ok := m.tree.Selected()
+	if !ok || cur.kind != sessionNodeSession {
+		return nil
+	}
+	sessID, err := uuid.Parse(cur.sessionID)
+	if err != nil {
+		return nil
+	}
+	svc := m.service
+	labels := m.labels
+	focusID := cur.sessionID
+	return func() tea.Msg {
+		if _, err := svc.CycleLabel(context.Background(), service.CycleSessionLabelRequest{
+			ID:     sessID,
+			Labels: labels,
+		}); err != nil {
+			return shared.SessionLabelCycledMsg{Err: err}
+		}
+		listResp, listErr := svc.List(context.Background(), service.ListSessionsRequest{})
+		return shared.SessionLabelCycledMsg{
+			Sessions: listResp.Sessions,
+			FocusID:  focusID,
+			Err:      listErr,
+		}
+	}
 }
 
 func (m Model) reorderSelected(direction int) tea.Cmd {
@@ -344,15 +393,18 @@ func sessionTreeNode(sess domain.Session) components.TreeNode[sessionNode] {
 	return components.TreeNode[sessionNode]{
 		ID: "session:" + sess.ID.String(),
 		Item: sessionNode{
-			kind:      sessionNodeSession,
-			sessionID: sess.ID.String(),
-			label:     label,
-			updatedAt: sess.UpdatedAt,
+			kind:       sessionNodeSession,
+			sessionID:  sess.ID.String(),
+			label:      label,
+			statusCode: sess.Label,
+			updatedAt:  sess.UpdatedAt,
 		},
 	}
 }
 
-func renderSessionNode(s *styles.Styles) components.TreeRenderFunc[sessionNode] {
+const labelBadgeGap = 1
+
+func renderSessionNode(s *styles.Styles, labels []domain.Label) components.TreeRenderFunc[sessionNode] {
 	return func(item sessionNode, _, depth, width int, hasKids, expanded, focused bool) string {
 		prefix := components.TreePrefix(depth, hasKids, expanded)
 		if item.kind == sessionNodeGroup {
@@ -362,19 +414,59 @@ func renderSessionNode(s *styles.Styles) components.TreeRenderFunc[sessionNode] 
 			}
 			return style.Render(prefix + item.label)
 		}
-		labelText := prefix + item.label
+
+		body := prefix + item.label
+		badge := renderLabelBadge(s, item.statusCode, labels)
 		aux := shared.FormatRelativeDuration(time.Since(item.updatedAt))
-		gap := width - lipgloss.Width(labelText) - lipgloss.Width(aux)
-		if gap < 1 {
+
+		bodyW := lipgloss.Width(body)
+		badgeW := lipgloss.Width(badge)
+		auxW := lipgloss.Width(aux)
+
+		badgeGap := 0
+		if badgeW > 0 {
+			badgeGap = labelBadgeGap
+		}
+		auxGap := labelBadgeGap
+
+		filler := width - bodyW - badgeGap - badgeW - auxGap - auxW
+		if filler < 0 && badgeW > 0 {
+			filler = width - bodyW - auxGap - auxW
+			badge, badgeW, badgeGap = "", 0, 0
+		}
+		if filler < 0 {
 			if focused {
-				return s.ListRow.Selected.Render(labelText)
+				return s.ListRow.Selected.Render(body)
 			}
-			return s.ListRow.Normal.Render(labelText)
+			return s.ListRow.Normal.Render(body)
 		}
-		spaces := strings.Repeat(" ", gap)
+
+		fillerSpaces := strings.Repeat(" ", filler)
+		badgeGapSpaces := strings.Repeat(" ", badgeGap)
+		auxGapSpaces := strings.Repeat(" ", auxGap)
+
 		if focused {
-			return s.ListRow.Selected.Render(labelText+spaces) + s.ListRow.AuxSelected.Render(aux)
+			left := s.ListRow.Selected.Render(body + fillerSpaces + badgeGapSpaces + badge)
+			right := s.ListRow.AuxSelected.Render(auxGapSpaces + aux)
+			return left + right
 		}
-		return s.ListRow.Normal.Render(labelText) + spaces + s.ListRow.Aux.Render(aux)
+		return s.ListRow.Normal.Render(body) + fillerSpaces + badgeGapSpaces + badge + auxGapSpaces + s.ListRow.Aux.Render(aux)
 	}
+}
+
+var staleLabelColor = lipgloss.Color("#9CA3AF")
+
+func renderLabelBadge(s *styles.Styles, code string, labels []domain.Label) string {
+	if code == "" {
+		return ""
+	}
+	color := staleLabelColor
+	text := code
+	if l, ok := domain.FindLabel(code, labels); ok {
+		color = lipgloss.Color(l.Color)
+		if l.Glyph != "" {
+			text = l.Glyph + " " + code
+		}
+	}
+	return s.SessionLabel.Foreground(color).Render(text)
 }

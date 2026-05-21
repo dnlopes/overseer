@@ -36,17 +36,17 @@ const (
 )
 
 type Model struct {
-	titlebar       TitleBarModel
-	leftPane       leftpane.Model
-	inspector      inspector.Model
-	helpBar        shared.HelpBarModel
-	createForm     sessionui.CreateFormModel
+	titlebar           TitleBarModel
+	leftPane           leftpane.Model
+	inspector          inspector.Model
+	helpBar            shared.HelpBarModel
+	createForm         sessionui.CreateFormModel
 	checkoutBranchForm sessionui.CheckoutBranchFormModel
-	deleteForm     sessionui.DeleteFormModel
-	scheduler      jobs.Model
-	activePopup    popupKind
-	cachedProjects []domain.Project
-	prStatuses     map[uuid.UUID]shared.PRStatusUpdatedMsg
+	deleteForm         sessionui.DeleteFormModel
+	scheduler          jobs.Model
+	activePopup        popupKind
+	cachedProjects     []domain.Project
+	prStatuses         map[uuid.UUID]shared.PRStatusUpdatedMsg
 
 	width           int
 	height          int
@@ -58,6 +58,7 @@ type Model struct {
 	projectsService service.ProjectService
 	launchers       []domain.Launcher
 	editors         []domain.Editor
+	labels          []domain.Label
 }
 
 func New(
@@ -67,9 +68,10 @@ func New(
 	scheduler jobs.Model,
 	launchers []domain.Launcher,
 	editors []domain.Editor,
+	labels []domain.Label,
 	minWidth, minHeight int,
 ) Model {
-	sessionsModel := sessionui.New(styles, sessionsService)
+	sessionsModel := sessionui.New(styles, sessionsService, labels)
 	detailsModel := sessiondetails.New(styles)
 	left := leftpane.New(styles, sessionsModel, detailsModel)
 	left.SetFocus(true)
@@ -82,6 +84,7 @@ func New(
 		scheduler:       scheduler,
 		sessionsService: sessionsService,
 		projectsService: projectsService,
+		labels:          labels,
 		launchers:       launchers,
 		editors:         editors,
 		minWidth:        minWidth,

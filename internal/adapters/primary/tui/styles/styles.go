@@ -155,11 +155,16 @@ type Styles struct {
 	Divider struct {
 		Horizontal lipgloss.Style
 	}
-	Help           HelpStyles
-	EmptyState     EmptyStateStyles
-	TooSmall       TooSmallStyles
-	Layout         LayoutStyles
-	Tab            TabStyles
+	Help       HelpStyles
+	EmptyState EmptyStateStyles
+	TooSmall   TooSmallStyles
+	Layout     LayoutStyles
+	Tab        TabStyles
+	// SessionLabel renders the right-aligned status badge on each session
+	// row. The badge's foreground colour is set at render time per-label
+	// via .Foreground(lipgloss.Color(label.Color)); this base style carries
+	// only the typographic weight so colour is the only per-label variable.
+	SessionLabel   lipgloss.Style
 	SessionDetails SessionDetailsStyles
 }
 
@@ -317,6 +322,7 @@ func NewWithTheme(themeName string) *Styles {
 			Inactive: lipgloss.NewStyle().Foreground(theme.Subtext).Padding(0, 2),
 			Bar:      lipgloss.NewStyle().Foreground(theme.Border),
 		},
+		SessionLabel: lipgloss.NewStyle().Bold(true),
 		SessionDetails: SessionDetailsStyles{
 			Glyph:   lipgloss.NewStyle().Foreground(theme.Muted),
 			Value:   lipgloss.NewStyle().Foreground(theme.Text),

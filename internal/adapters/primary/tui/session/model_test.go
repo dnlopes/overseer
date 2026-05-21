@@ -22,7 +22,7 @@ import (
 
 func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -52,7 +52,7 @@ func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 func TestModel_RawGroupingModeRendersSessionsWithoutVirtualRows(t *testing.T) {
 	overseerID := uuid.New()
 	otherID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
 	model.groupingMode = sessionGroupingNone
 	model.SetSize(80, 20)
@@ -74,7 +74,7 @@ func TestModel_RawGroupingModeRendersSessionsWithoutVirtualRows(t *testing.T) {
 
 func TestModel_SelectionEmitsClearedWhenCursorLandsOnGroup(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetFocus(true)
 	alpha := testutil.MakeSession("alpha", overseerID)
@@ -105,7 +105,7 @@ func TestModel_LoadSessionsUsesRawSessions(t *testing.T) {
 	alpha := testutil.MakeSession("alpha", uuid.New())
 	svc, repo := newSessionServiceWithRepo(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{alpha}, nil).Once()
-	model := New(styles.New(), svc)
+	model := New(styles.New(), svc, domain.DefaultLabels)
 
 	msg := model.loadSessions()().(shared.SessionsLoadedMsg)
 
@@ -119,7 +119,7 @@ func TestModel_LoadSessionsUsesRawSessions(t *testing.T) {
 
 func TestModel_GroupRowRendersDifferentlyWhenCursorMovesToIt(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -138,7 +138,7 @@ func TestModel_GroupRowRendersDifferentlyWhenCursorMovesToIt(t *testing.T) {
 
 func TestModel_RenderHasNoNumberPrefix(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -155,7 +155,7 @@ func TestModel_RenderHasNoNumberPrefix(t *testing.T) {
 func TestModel_NextGroupJumpsToNextProject(t *testing.T) {
 	overseerID := uuid.New()
 	otherID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -175,7 +175,7 @@ func TestModel_NextGroupJumpsToNextProject(t *testing.T) {
 func TestModel_PrevGroupJumpsToPreviousProject(t *testing.T) {
 	overseerID := uuid.New()
 	otherID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -193,7 +193,7 @@ func TestModel_PrevGroupJumpsToPreviousProject(t *testing.T) {
 
 func TestModel_CtrlDownMovesCursorFiveRows(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -220,7 +220,7 @@ func TestModel_CtrlDownMovesCursorFiveRows(t *testing.T) {
 
 func TestModel_CtrlUpMovesCursorFiveRowsClampedAtTop(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -246,7 +246,7 @@ func TestModel_ShiftDownReordersSelectedSession(t *testing.T) {
 	repo.EXPECT().Get(mock.Anything, alpha.ID).Return(alpha, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{alpha, beta}, nil).Twice()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Twice()
-	model := New(styles.New(), svc)
+	model := New(styles.New(), svc, domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -272,7 +272,7 @@ func TestModel_ShiftDownReordersSelectedSession(t *testing.T) {
 func TestModel_ShiftDownNoOpOnGroupRow(t *testing.T) {
 	overseerID := uuid.New()
 	alpha := testutil.MakeSession("alpha", overseerID)
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -292,7 +292,7 @@ func TestModel_SessionReorderedMsgRestoresCursorOnMovedSession(t *testing.T) {
 	alpha.Order = 1
 	beta := testutil.MakeSession("beta", overseerID)
 	beta.Order = 2
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -325,7 +325,7 @@ func navigateToTop(t *testing.T, m tea.Model) tea.Model {
 
 func TestModel_DKeyEmitsDeleteRequestedForSelectedSession(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -351,7 +351,7 @@ func TestModel_DKeyEmitsDeleteRequestedForSelectedSession(t *testing.T) {
 
 func TestModel_DKeyWithGroupNodeSelected_NoOp(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -370,7 +370,7 @@ func TestModel_SessionDeletedMsg_TriggersReload(t *testing.T) {
 	alpha := testutil.MakeSession("alpha", uuid.New())
 	svc, repo := newSessionServiceWithRepo(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{alpha}, nil).Once()
-	model := New(styles.New(), svc)
+	model := New(styles.New(), svc, domain.DefaultLabels)
 
 	_, cmd := model.Update(shared.SessionDeletedMsg{})
 
@@ -409,7 +409,7 @@ func keyPress(value string) tea.KeyPressMsg {
 
 func TestModel_View_RendersUpdatedAtDurationRightAlignedOnEachSessionRow(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)
@@ -441,7 +441,7 @@ func TestModel_View_RendersUpdatedAtDurationRightAlignedOnEachSessionRow(t *test
 
 func TestModel_View_DoesNotRenderDurationOnGroupRows(t *testing.T) {
 	overseerID := uuid.New()
-	model := New(styles.New(), newSessionService(t))
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
 	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
 	model.SetSize(80, 20)
 	model.SetFocus(true)

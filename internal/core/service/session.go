@@ -307,6 +307,41 @@ func (s *SessionService) Rename(ctx context.Context, req RenameSessionRequest) (
 	return RenameSessionResponse{Session: sess}, nil
 }
 
+// --- CycleLabel ---
+
+type CycleSessionLabelRequest struct {
+	ID     uuid.UUID
+	Labels []domain.Label
+}
+
+type CycleSessionLabelResponse struct {
+	Session domain.Session
+}
+
+// CycleLabel advances the session's status label through the configured
+// cycle (see [domain.NextLabelCode]). Driven by the l keybinding in the
+// TUI: empty → first → … → last → empty. The Labels slice is the
+// configured cycle order — typically [domain.DefaultLabels] or whatever
+// the user provided in config. An empty Labels slice clears whatever
+// label the session held.
+func (s *SessionService) CycleLabel(ctx context.Context, req CycleSessionLabelRequest) (CycleSessionLabelResponse, error) {
+	sess, err := s.repo.Get(ctx, req.ID)
+	if err != nil {
+		return CycleSessionLabelResponse{}, err
+	}
+
+	next := domain.NextLabelCode(sess.Label, req.Labels)
+	if err := sess.AssignLabel(next); err != nil {
+		return CycleSessionLabelResponse{}, err
+	}
+
+	if err := s.repo.Save(ctx, sess); err != nil {
+		return CycleSessionLabelResponse{}, fmt.Errorf("save session: %w", err)
+	}
+
+	return CycleSessionLabelResponse{Session: sess}, nil
+}
+
 // --- List ---
 
 type ListSessionsRequest struct{}

@@ -53,6 +53,7 @@ type Session struct {
 	FeatureBranch string
 	AgentCommand  string
 	EditorCommand string
+	Label         string `json:",omitempty"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -204,6 +205,22 @@ func (s *Session) AssignEditorCommand(cmd string) error {
 	return nil
 }
 
+// AssignLabel sets the session's status label code (e.g. "WIP", "done").
+// The empty string is accepted and clears the label — pressing the l
+// shortcut past the last label cycles back through the empty state.
+// Codes longer than 50 characters are rejected to guard against
+// corrupted or hand-edited storage; valid codes are validated upstream
+// at config load (see Label / NewLabel).
+func (s *Session) AssignLabel(code string) error {
+	code = strings.TrimSpace(code)
+	if len(code) > labelCodeMaxLen {
+		return ErrSessionLabelTooLong
+	}
+	s.Label = code
+	s.UpdatedAt = time.Now()
+	return nil
+}
+
 // Session ports.
 
 type SessionRepository interface {
@@ -249,4 +266,5 @@ var (
 	ErrSessionNoAgentCommandAvailable  = errors.New("session has no agent command and no default launcher is configured")
 	ErrSessionEmptyEditorCommand       = errors.New("session editor command cannot be empty")
 	ErrSessionNoEditorCommandAvailable = errors.New("session has no editor command and no default editor is configured")
+	ErrSessionLabelTooLong             = errors.New("session label exceeds 50 characters")
 )

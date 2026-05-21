@@ -25,4 +25,6 @@ var (
 	deleteSessionKeyBinding = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete session"))
 	deleteConfirmKeyBinding = key.NewBinding(key.WithKeys("y", "enter"), key.WithHelp("y/enter", "confirm delete"))
 	deleteCancelKeyBinding  = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel"))
+
+	cycleLabelKeyBinding = key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "cycle label"))
 )

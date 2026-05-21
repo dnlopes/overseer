@@ -1863,3 +1863,166 @@ func TestSessionService_CheckoutBranch_DuplicateNameWithinSameProject(t *testing
 		t.Fatalf("CheckoutBranch() error = %v, want %v", err, domain.ErrSessionAlreadyExists)
 	}
 }
+
+func TestSessionService_CycleLabel_FromEmptyAssignsFirst(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	sess.Label = ""
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	var saved domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { saved = s }).
+		Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.CycleLabel(context.Background(), CycleSessionLabelRequest{
+		ID:     sess.ID,
+		Labels: domain.DefaultLabels,
+	})
+
+	if err != nil {
+		t.Fatalf("CycleLabel() error = %v", err)
+	}
+	if resp.Session.Label != "WIP" {
+		t.Fatalf("response Label = %q, want %q", resp.Session.Label, "WIP")
+	}
+	if saved.Label != "WIP" {
+		t.Fatalf("saved Label = %q, want %q", saved.Label, "WIP")
+	}
+}
+
+func TestSessionService_CycleLabel_FromLastClears(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	sess.Label = "draft"
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	var saved domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { saved = s }).
+		Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.CycleLabel(context.Background(), CycleSessionLabelRequest{
+		ID:     sess.ID,
+		Labels: domain.DefaultLabels,
+	})
+
+	if err != nil {
+		t.Fatalf("CycleLabel() error = %v", err)
+	}
+	if resp.Session.Label != "" {
+		t.Fatalf("response Label = %q, want empty (cleared)", resp.Session.Label)
+	}
+	if saved.Label != "" {
+		t.Fatalf("saved Label = %q, want empty (cleared)", saved.Label)
+	}
+}
+
+func TestSessionService_CycleLabel_FromMiddleAdvances(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	sess.Label = "reviewing"
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.CycleLabel(context.Background(), CycleSessionLabelRequest{
+		ID:     sess.ID,
+		Labels: domain.DefaultLabels,
+	})
+
+	if err != nil {
+		t.Fatalf("CycleLabel() error = %v", err)
+	}
+	if resp.Session.Label != "ready" {
+		t.Fatalf("response Label = %q, want %q", resp.Session.Label, "ready")
+	}
+}
+
+func TestSessionService_CycleLabel_StaleResetsToFirst(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	sess.Label = "no-longer-configured"
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.CycleLabel(context.Background(), CycleSessionLabelRequest{
+		ID:     sess.ID,
+		Labels: domain.DefaultLabels,
+	})
+
+	if err != nil {
+		t.Fatalf("CycleLabel() error = %v", err)
+	}
+	if resp.Session.Label != "WIP" {
+		t.Fatalf("response Label = %q, want %q (stale resets to first)", resp.Session.Label, "WIP")
+	}
+}
+
+func TestSessionService_CycleLabel_EmptyLabelsConfigClears(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	sess.Label = "WIP"
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.CycleLabel(context.Background(), CycleSessionLabelRequest{
+		ID:     sess.ID,
+		Labels: nil,
+	})
+
+	if err != nil {
+		t.Fatalf("CycleLabel() error = %v", err)
+	}
+	if resp.Session.Label != "" {
+		t.Fatalf("response Label = %q, want empty (no labels configured)", resp.Session.Label)
+	}
+}
+
+func TestSessionService_CycleLabel_NotFound(t *testing.T) {
+	missingID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, missingID).
+		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.CycleLabel(context.Background(), CycleSessionLabelRequest{
+		ID:     missingID,
+		Labels: domain.DefaultLabels,
+	})
+
+	if !errors.Is(err, domain.ErrSessionNotFound) {
+		t.Fatalf("CycleLabel() error = %v, want %v", err, domain.ErrSessionNotFound)
+	}
+}
+
+func TestSessionService_CycleLabel_BumpsUpdatedAt(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	sess.Label = ""
+	sess.UpdatedAt = time.Now().Add(-time.Hour)
+	originalUpdated := sess.UpdatedAt
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+
+	var saved domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { saved = s }).
+		Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.CycleLabel(context.Background(), CycleSessionLabelRequest{
+		ID:     sess.ID,
+		Labels: domain.DefaultLabels,
+	})
+	if err != nil {
+		t.Fatalf("CycleLabel() error = %v", err)
+	}
+
+	if !saved.UpdatedAt.After(originalUpdated) {
+		t.Fatalf("saved UpdatedAt = %v, want after %v", saved.UpdatedAt, originalUpdated)
+	}
+}
