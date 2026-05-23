@@ -62,6 +62,7 @@ type CreateSessionRequest struct {
 	Branch         string
 	AgentCommand   string
 	EditorCommand  string
+	AgentType      domain.AgentType
 }
 
 type CreateSessionResponse struct {
@@ -95,6 +96,12 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 
 	if req.EditorCommand != "" {
 		if err := sess.AssignEditorCommand(req.EditorCommand); err != nil {
+			return CreateSessionResponse{}, err
+		}
+	}
+
+	if req.AgentType != "" {
+		if err := sess.AssignAgentType(req.AgentType); err != nil {
 			return CreateSessionResponse{}, err
 		}
 	}

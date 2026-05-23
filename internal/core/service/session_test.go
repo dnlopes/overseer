@@ -514,6 +514,44 @@ func TestSessionService_Create_WithEditorCommand(t *testing.T) {
 	}
 }
 
+func TestCreateSession_CapturesAgentTypeFromLauncher(t *testing.T) {
+	projID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+	repoPath := expectProjectLookup(t, projects, projID, "overseer")
+	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
+	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").
+		Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "claude").
+		Return("tmux-alpha-agent", nil).Once()
+
+	var savedSession domain.Session
+	repo.EXPECT().Save(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, s domain.Session) { savedSession = s }).
+		Return(nil).Once()
+	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	resp, err := svc.Create(context.Background(), CreateSessionRequest{
+		Name:           "alpha",
+		ProjectID:      projID,
+		CreateWorktree: true,
+		BaseBranch:     "main",
+		AgentCommand:   "claude",
+		AgentType:      domain.AgentTypeClaudeCode,
+	})
+
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if resp.Session.AgentType != domain.AgentTypeClaudeCode {
+		t.Fatalf("Create() Session.AgentType = %q, want %q", resp.Session.AgentType, domain.AgentTypeClaudeCode)
+	}
+	if savedSession.AgentType != domain.AgentTypeClaudeCode {
+		t.Fatalf("SessionRepository.Save session.AgentType = %q, want %q", savedSession.AgentType, domain.AgentTypeClaudeCode)
+	}
+}
+
 func TestSessionService_Create_RejectsInvalidEditorCommand(t *testing.T) {
 	repo, projects, tmux, git := newSessionMocks(t)
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
