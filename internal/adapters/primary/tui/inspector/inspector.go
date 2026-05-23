@@ -118,3 +118,7 @@ func (m *Model) SetSize(width, height int) {
 func (m *Model) SetFocus(focused bool) {
 	m.focused = focused
 }
+
+func (m Model) ActiveViewLabel() string {
+	return m.views[m.activeIx].Label()
+}
