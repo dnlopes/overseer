@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/jobs"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
+	"github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/claudecode"
+	agentstatusregistry "github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/registry"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/git"
 	githubcli "github.com/dnlopes/overseer/internal/adapters/secondary/github"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/storage"
@@ -92,8 +95,16 @@ func main() {
 	projectSvc := service.NewProjectService(store.Projects(), gitAdapter, log)
 	prSvc := service.NewPullRequestService(githubAdapter, log)
 
+	agentStatusRegistry := agentstatusregistry.New()
+	agentStatusRegistry.Register(claudecode.NewPaneDetector(tmuxAdapter))
+	agentStatusSvc := service.NewAgentStatusService(store.Sessions(), tmuxAdapter, agentStatusRegistry, log)
+
 	prJob := buildPullRequestJob(sessionSvc, projectSvc, prSvc)
-	scheduler := jobs.New(prJob)
+	schedulerJobs := []jobs.Job{prJob}
+	if cfg.AgentStatus.Enabled {
+		schedulerJobs = append(schedulerJobs, buildAgentStatusDebugJob(agentStatusSvc, cfg.AgentStatus.RefreshInterval, log))
+	}
+	scheduler := jobs.New(schedulerJobs...)
 
 	previewRefresh, err := cfg.PreviewRefreshDuration()
 	if err != nil {
@@ -137,6 +148,41 @@ func buildPullRequestJob(
 						return nil
 					}
 					return shared.JobsBatchMsg{Cmds: fanOutPRFetches(prSvc, data)}
+				},
+			)
+		},
+	}
+}
+
+// buildAgentStatusDebugJob returns a scheduler job that calls
+// AgentStatusService.PollAll on every tick and logs each session's
+// status at INFO. This is the Slice-2 deliverable: status detection is
+// proven end-to-end via the log, with no TUI wiring yet. Slice 3
+// replaces this job with one that emits shared.AgentStatusesUpdatedMsg
+// into the Bubble Tea event loop for rendering.
+func buildAgentStatusDebugJob(svc *service.AgentStatusService, interval time.Duration, log *slog.Logger) jobs.Job {
+	return jobs.Job{
+		ID:       "agent-status-debug",
+		Interval: interval,
+		Run: func() tea.Cmd {
+			return shared.Request(
+				func(ctx context.Context) (service.PollAllAgentStatusesResponse, error) {
+					return svc.PollAll(ctx, service.PollAllAgentStatusesRequest{})
+				},
+				func(resp service.PollAllAgentStatusesResponse, err error) tea.Msg {
+					if err != nil {
+						log.Warn("agent-status-debug poll failed", "error", err)
+						return nil
+					}
+					for id, st := range resp.Statuses {
+						log.Info("agent-status-debug",
+							"session_id", id.String(),
+							"kind", string(st.Kind),
+							"source", st.Source,
+							"reason", st.Reason,
+						)
+					}
+					return nil
 				},
 			)
 		},
