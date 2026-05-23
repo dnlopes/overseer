@@ -329,7 +329,7 @@ func NewWithTheme(themeName string, disableEmoji bool) *Styles {
 			Separator:   lipgloss.NewStyle().Foreground(theme.Muted).Background(theme.HelpBarBg),
 		},
 		EmptyState: EmptyStateStyles{
-			Title: lipgloss.NewStyle().Foreground(theme.Text).Bold(true),
+			Title: lipgloss.NewStyle().Foreground(theme.Subtext).Bold(true),
 			Hint:  lipgloss.NewStyle().Foreground(theme.Subtext),
 		},
 		TooSmall: TooSmallStyles{
