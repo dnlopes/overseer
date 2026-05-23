@@ -1,0 +1,58 @@
+{
+  "projects": [
+    {
+      "ID": "11111111-1111-1111-1111-111111111111",
+      "Path": "/repo/example",
+      "Name": "example",
+      "CreatedAt": "2025-01-01T00:00:00Z",
+      "UpdatedAt": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "sessions": [
+    {
+      "ID": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "Name": "claude-prefix-session",
+      "ProjectID": "11111111-1111-1111-1111-111111111111",
+      "Order": 1,
+      "AgentCommand": "claude",
+      "CreatedAt": "2025-01-01T00:00:00Z",
+      "UpdatedAt": "2025-01-01T00:00:00Z"
+    },
+    {
+      "ID": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "Name": "claude-args-session",
+      "ProjectID": "11111111-1111-1111-1111-111111111111",
+      "Order": 2,
+      "AgentCommand": "claude --some-flag",
+      "CreatedAt": "2025-01-01T00:00:00Z",
+      "UpdatedAt": "2025-01-01T00:00:00Z"
+    },
+    {
+      "ID": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "Name": "opencode-session",
+      "ProjectID": "11111111-1111-1111-1111-111111111111",
+      "Order": 3,
+      "AgentCommand": "opencode --config /tmp/c.json",
+      "CreatedAt": "2025-01-01T00:00:00Z",
+      "UpdatedAt": "2025-01-01T00:00:00Z"
+    },
+    {
+      "ID": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "Name": "unknown-command-session",
+      "ProjectID": "11111111-1111-1111-1111-111111111111",
+      "Order": 4,
+      "AgentCommand": "some-other-agent --foo",
+      "CreatedAt": "2025-01-01T00:00:00Z",
+      "UpdatedAt": "2025-01-01T00:00:00Z"
+    },
+    {
+      "ID": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+      "Name": "no-agent-command-session",
+      "ProjectID": "11111111-1111-1111-1111-111111111111",
+      "Order": 5,
+      "AgentCommand": "",
+      "CreatedAt": "2025-01-01T00:00:00Z",
+      "UpdatedAt": "2025-01-01T00:00:00Z"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,9 +70,42 @@ func (s *Store) load() error {
 		s.projects[project.ID] = project
 	}
 	for _, sess := range schema.Sessions {
+		if sess.AgentType == "" {
+			inferred := inferAgentType(sess.AgentCommand)
+			s.logger.Info("storage: agent type inferred for legacy session",
+				"session_id", sess.ID.String(),
+				"session_name", sess.Name,
+				"agent_command", sess.AgentCommand,
+				"agent_type", string(inferred),
+			)
+			sess.AgentType = inferred
+		}
 		s.sessions[sess.ID] = sess
 	}
 	return nil
+}
+
+// inferAgentType maps a legacy session's AgentCommand to an AgentType using
+// a simple prefix match against the built-in defaults. The first token of
+// the command (e.g. "claude" from "claude --debug") is compared to the
+// known agent commands; anything else falls back to AgentTypeUnknown, which
+// keeps the session routable through the registry (resolves to no detector
+// → Unknown status).
+func inferAgentType(agentCommand string) domain.AgentType {
+	first := strings.TrimSpace(agentCommand)
+	if first == "" {
+		return domain.AgentTypeUnknown
+	}
+	if idx := strings.IndexAny(first, " \t"); idx >= 0 {
+		first = first[:idx]
+	}
+	switch first {
+	case "claude":
+		return domain.AgentTypeClaudeCode
+	case "opencode":
+		return domain.AgentTypeOpenCode
+	}
+	return domain.AgentTypeUnknown
 }
 
 func (s *Store) quarantine(reason string) {
