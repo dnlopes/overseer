@@ -258,10 +258,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case shared.SessionSelectedMsg:
 		var cmd tea.Cmd
 		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
+		var inspectorCmd tea.Cmd
+		m.inspector, inspectorCmd = shared.UpdateModel(m.inspector, msg)
 		if !msg.Session.HasWorktree() {
-			return m, tea.Batch(cmd, m.loadCurrentBranchCmd(msg.Session.ProjectID))
+			return m, tea.Batch(cmd, inspectorCmd, m.loadCurrentBranchCmd(msg.Session.ProjectID))
 		}
-		return m, cmd
+		return m, tea.Batch(cmd, inspectorCmd)
 	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg, shared.RenamePopupCloseMsg, shared.HelpPopupCloseMsg:
 		m.activePopup = popupNone
 		return m, nil
