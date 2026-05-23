@@ -1,0 +1,76 @@
+branches: [main]
+tagFormat: "v${version}"
+ci: true
+debug: false
+
+plugins:
+  - - "@semantic-release/commit-analyzer"
+    - preset: "angular"
+      releaseRules:
+        - breaking: true
+          release: major
+        - type: feat
+          release: minor
+        - type: fix
+          release: patch
+        - type: chore
+          release: patch
+        - type: refactor
+          release: patch
+        - type: style
+          release: patch
+        - type: perf
+          release: patch
+        - type: test
+          release: patch
+        - type: docs
+          release: patch
+        - revert: true
+          release: patch
+      parserOpts:
+        noteKeywords:
+          - BREAKING CHANGE
+          - BREAKING CHANGES
+          - BREAKING
+        mergePattern: '^Merge pull request #(\d+) from (.*)$'
+        mergeCorrespondence:
+          - id
+          - source
+
+  - - "@semantic-release/release-notes-generator"
+    - preset: "angular"
+      parserOpts:
+        noteKeywords:
+          - BREAKING CHANGE
+          - BREAKING CHANGES
+      writerOpts:
+        commitsSort:
+          - subject
+          - scope
+      presetConfig:
+        types:
+          - type: feat
+            section: Features
+          - type: fix
+            section: Bug Fixes
+          - type: perf
+            section: Performance Improvements
+          - type: revert
+            section: Reverts
+          - type: docs
+            section: Documentation
+            hidden: false
+          - type: style
+            section: Styles
+            hidden: false
+          - type: chore
+            section: Miscellaneous Chores
+            hidden: false
+          - type: refactor
+            section: Code Refactoring
+            hidden: false
+          - type: test
+            section: Tests
+            hidden: false
+
+  - "@semantic-release/github"

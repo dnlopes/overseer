@@ -90,7 +90,7 @@ func New(
 	left.SetFocus(true)
 	m := Model{
 		styles:                  styles,
-		titlebar:                newTitlebar(styles, "Overseer"),
+		titlebar:                newTitlebar(styles, "overseer"),
 		leftPane:                left,
 		inspector:               inspector.New(styles, sessionsService, previewRefreshInterval),
 		helpBar:                 shared.NewHelpBarModel(styles, slices.Concat(sessionsKeyBindings, inspectorKeyBindings, generalKeyBindings)),
@@ -258,10 +258,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case shared.SessionSelectedMsg:
 		var cmd tea.Cmd
 		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
+		var inspectorCmd tea.Cmd
+		m.inspector, inspectorCmd = shared.UpdateModel(m.inspector, msg)
 		if !msg.Session.HasWorktree() {
-			return m, tea.Batch(cmd, m.loadCurrentBranchCmd(msg.Session.ProjectID))
+			return m, tea.Batch(cmd, inspectorCmd, m.loadCurrentBranchCmd(msg.Session.ProjectID))
 		}
-		return m, cmd
+		return m, tea.Batch(cmd, inspectorCmd)
 	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg, shared.RenamePopupCloseMsg, shared.HelpPopupCloseMsg:
 		m.activePopup = popupNone
 		return m, nil
@@ -341,14 +343,15 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return tea.Batch(cmds...), true
 	}
-	if key.Matches(msg, attachShellKeyBinding) {
-		if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
-			return cmd, true
-		}
-	}
-	if key.Matches(msg, attachAgentKeyBinding) {
-		if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
-			return cmd, true
+	if key.Matches(msg, attachKeyBinding) {
+		if m.inspector.ActiveViewLabel() == "Shell" {
+			if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
+				return cmd, true
+			}
+		} else {
+			if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
+				return cmd, true
+			}
 		}
 	}
 	if key.Matches(msg, openEditorKeyBinding) {

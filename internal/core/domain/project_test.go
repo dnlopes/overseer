@@ -12,7 +12,7 @@ import (
 func TestNewProject_CreatesProjectWithProvidedName(t *testing.T) {
 	before := time.Now()
 
-	p, err := NewProject("/home/user/repos/overseer", "Overseer")
+	p, err := NewProject("/home/user/repos/overseer", "overseer")
 
 	if err != nil {
 		t.Fatalf("NewProject() error = %v", err)
@@ -20,8 +20,8 @@ func TestNewProject_CreatesProjectWithProvidedName(t *testing.T) {
 	if p.ID == uuid.Nil {
 		t.Fatal("NewProject() ID is nil")
 	}
-	if p.Name != "Overseer" {
-		t.Fatalf("NewProject() Name = %q, want %q", p.Name, "Overseer")
+	if p.Name != "overseer" {
+		t.Fatalf("NewProject() Name = %q, want %q", p.Name, "overseer")
 	}
 	if p.Path != "/home/user/repos/overseer" {
 		t.Fatalf("NewProject() Path = %q, want %q", p.Path, "/home/user/repos/overseer")

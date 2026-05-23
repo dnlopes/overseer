@@ -9,7 +9,7 @@ sleep 2
 tmux capture-pane -t qa_c9 -p > "$EVID/qa1.txt"
 tmux capture-pane -t qa_c9 -p -e > "$EVID/qa1-ansi.txt"
 tmux kill-session -t qa_c9
-grep -q "Overseer" "$EVID/qa1.txt" || { echo "FAIL C9: no Overseer branding"; exit 1; }
+grep -q "overseer" "$EVID/qa1.txt" || { echo "FAIL C9: no overseer branding"; exit 1; }
 grep -q $'\xe2\x95\xad\|\xe2\x95\xae\|\xe2\x95\xb0\|\xe2\x95\xaf' "$EVID/qa1-ansi.txt" || { echo "FAIL C9: no rounded border chars"; exit 1; }
 grep -q $'\x1b\[' "$EVID/qa1-ansi.txt" || { echo "FAIL C9: no ANSI color codes"; exit 1; }
 echo "PASS C9"

@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/google/uuid"
 
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	"github.com/dnlopes/overseer/internal/core/service"
 )
@@ -86,13 +87,13 @@ func (v *streamView) Update(msg tea.Msg) (View, tea.Cmd) {
 
 func (v *streamView) Body() string {
 	if v.sessionID == uuid.Nil {
-		return v.styles.EmptyState.Title.Render("Select a session to preview")
+		return components.CenteredContent(v.styles, v.styles.EmptyState.Title.Render("Select a session to preview"), v.width, v.height)
 	}
 	if v.err != nil {
-		return v.styles.EmptyState.Title.Render("Preview error: " + v.err.Error())
+		return components.CenteredContent(v.styles, v.styles.EmptyState.Title.Render("Preview error: "+v.err.Error()), v.width, v.height)
 	}
 	if !v.ready {
-		return v.styles.EmptyState.Title.Render(v.notReadyMessage)
+		return components.CenteredContent(v.styles, v.styles.EmptyState.Title.Render(v.notReadyMessage), v.width, v.height)
 	}
 	return v.content
 }

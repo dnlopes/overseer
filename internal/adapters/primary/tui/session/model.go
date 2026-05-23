@@ -352,13 +352,14 @@ func (m Model) SelectedSession() (domain.Session, bool) {
 
 func (m Model) View() tea.View {
 	content := m.tree.View()
+	innerW, innerH := components.TitledPanelInnerSize(m.styles, m.focused, m.width, m.height)
 	if m.err != nil {
-		content = m.styles.EmptyState.Title.Render("Unable to load sessions")
+		content = components.CenteredContent(m.styles, m.styles.EmptyState.Title.Render("Unable to load sessions"), innerW, innerH)
 	} else if content == "" {
-		content = strings.Join([]string{
+		content = components.CenteredContent(m.styles, strings.Join([]string{
 			m.styles.EmptyState.Title.Render("No sessions"),
 			m.styles.EmptyState.Hint.Render("Press n to create one"),
-		}, "\n")
+		}, "\n"), innerW, innerH)
 	}
 	return components.PanelWithTitle(m.styles, content, "Sessions", m.focused, m.width, m.height)
 }

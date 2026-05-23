@@ -1,0 +1,68 @@
+version: 2
+
+project_name: overseer
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: overseer
+    main: ./cmd/overseer
+    binary: overseer
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^refactor:"
+      - "^style:"
+
+brews:
+  - name: overseer
+    repository:
+      owner: dnlopes
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Formula
+    homepage: "https://github.com/dnlopes/overseer"
+    description: "Overseer - A terminal UI application"
+    license: "MIT"
+    test: |
+      system "#{bin}/overseer --version"
+    install: |
+      bin.install "overseer"

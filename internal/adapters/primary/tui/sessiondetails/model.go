@@ -84,7 +84,7 @@ func (m Model) View() tea.View {
 	if m.width <= 0 || m.height <= 0 {
 		return tea.NewView("")
 	}
-	innerW, _ := components.PanelInnerSize(m.styles, false, m.width, m.height)
-	content := m.renderContent(innerW)
+	innerW, innerH := components.PanelInnerSize(m.styles, false, m.width, m.height)
+	content := m.renderContent(innerW, innerH)
 	return components.PanelWithTitle(m.styles, content, "Session details", false, m.width, m.height)
 }

@@ -16,7 +16,7 @@ func init() {
 
 func TestColorGolden_TitleBarBranding(t *testing.T) {
 	s := styles.New()
-	out := s.TitleBar.Branding.Render("Overseer")
+	out := s.TitleBar.Branding.Render("overseer")
 	testutil.RequireEqualColor(t, "titlebar-branding", out)
 }
 

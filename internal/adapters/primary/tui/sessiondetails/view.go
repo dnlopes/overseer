@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/components"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	"github.com/dnlopes/overseer/internal/core/domain"
 )
@@ -24,9 +25,9 @@ const (
 	columnGap        = 2
 )
 
-func (m Model) renderContent(width int) string {
+func (m Model) renderContent(width, height int) string {
 	if m.session == nil {
-		return m.styles.SessionDetails.Hint.Render("Select a session")
+		return components.CenteredContent(m.styles, m.styles.SessionDetails.Hint.Render("Select a session"), width, height)
 	}
 
 	sections := [][]string{m.renderRepositorySection(width)}
