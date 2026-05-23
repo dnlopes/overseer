@@ -1,0 +1,26 @@
+name: CI - Backend
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+  statuses: write
+
+concurrency:
+  group: ${{ github.ref }}-golang-checks
+  cancel-in-progress: true
+
+jobs:
+  golang:
+    name: Golang
+    uses: dnlopes/Reusable.Workflows/.github/workflows/golang.yaml@v1
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    with:
+      golangProjectDir: .
+      goVersion: "1.24"
+      buildCommand: 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bin/overseer ./cmd/overseer/'
+      testCommand: "go test -v ./... -coverprofile=cover.out"
