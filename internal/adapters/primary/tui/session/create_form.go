@@ -321,6 +321,13 @@ func (m CreateFormModel) resolvedAgentCommand() string {
 	return m.launchers[m.launcherIdx].Command
 }
 
+func (m CreateFormModel) resolvedAgentType() domain.AgentType {
+	if len(m.launchers) == 0 {
+		return ""
+	}
+	return m.launchers[m.launcherIdx].AgentType
+}
+
 func (m CreateFormModel) resolvedEditorCommand() string {
 	if len(m.editors) == 0 {
 		return ""
@@ -368,6 +375,7 @@ func (m CreateFormModel) submit() (tea.Model, tea.Cmd) {
 		CreateWorktree: m.createWorktree,
 		AgentCommand:   m.resolvedAgentCommand(),
 		EditorCommand:  m.resolvedEditorCommand(),
+		AgentType:      m.resolvedAgentType(),
 	}
 	if m.createWorktree {
 		if sel, ok := m.baseBranchPicker.selected(); ok {
