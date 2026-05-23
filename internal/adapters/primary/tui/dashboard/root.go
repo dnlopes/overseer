@@ -343,14 +343,15 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		}
 		return tea.Batch(cmds...), true
 	}
-	if key.Matches(msg, attachShellKeyBinding) {
-		if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
-			return cmd, true
-		}
-	}
-	if key.Matches(msg, attachAgentKeyBinding) {
-		if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
-			return cmd, true
+	if key.Matches(msg, attachKeyBinding) {
+		if m.inspector.ActiveViewLabel() == "Shell" {
+			if cmd := m.attachSelectedSessionShellCmd(); cmd != nil {
+				return cmd, true
+			}
+		} else {
+			if cmd := m.attachSelectedSessionAgentCmd(); cmd != nil {
+				return cmd, true
+			}
 		}
 	}
 	if key.Matches(msg, openEditorKeyBinding) {
