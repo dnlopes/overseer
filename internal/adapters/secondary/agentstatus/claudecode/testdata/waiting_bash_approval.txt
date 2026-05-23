@@ -1,0 +1,50 @@
+[91m│[39m                      [91m▝▜[40m█████[49m▛▘[39m                     [2m[91m│[0m Added `claude agents --json` to list live Claude sessions as JSON for scripting (tmux-resurrect, status bars, session pickers)                  [91m│
+│[39m                      [91m  ▘▘ ▝▝  [39m                     [2m[91m│[0m Added `agent_id` and `parent_agent_id` attributes to `claude_code.tool` OTEL spans, and fixed trace parenting so background subagent spans nes… [91m│
+│[39m [37mOpus 4.7 (1M context) with xh… · API Usage Billing[39m [2m[91m│[0m Status line JSON input now includes GitHub repo and PR information when detected                                                                [91m│
+│[39m [37m · Outsystems[39m                                      [2m[91m│[0m [3m[37m/release-notes for more[0m                                                                                                                         [91m│
+│[39m   [37m~/.config/overseer-personal/worktrees/7208a750[39m   [2m[91m│[0m                                                                                                                                                 [91m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+[37m[100m❯ [97mWhat is 2+2? Just say the number, nothing else.[39m
+
+[97m[49m⏺[39m 4
+
+[37m✻[39m [37mChurned for 2s[39m
+
+[37m[100m❯ [97mRun the bash command 'echo hello-from-claude'[39m
+
+[97m[49m⏺[39m I'll run that command.
+
+  [37mRan [1m1[0m[37m shell command [39m
+
+[97m⏺[39m hello-from-claude
+
+[37m✻[39m [37mCogitated for 4s[39m
+
+[37m[100m❯ [97mUse the Edit tool to change /tmp/nonexistent-file-xyz.txt - this should ask permission[39m
+
+[97m[49m⏺[39m I'll try to edit that file. Note that the Edit tool requires reading the file first, so let me try reading it.
+
+  [37mRead [1m1[0m[37m file [39m
+
+[97m⏺[39m The file doesn't exist, so I can't use Edit on it (Edit requires the file to exist and be read first). Would you like me to create the file with the Write tool instead?
+
+[37m✻[39m [37mBaked for 5s[39m
+
+[37m[100m❯ [97mRun the bash command: rm /tmp/some-test-file-doesnotexist[39m
+
+[37m[49m⏺[39m Running [1m1[0m shell command…
+[37m  ⎿  $ rm /tmp/some-test-file-doesnotexist[39m
+
+[94m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[94mBash command[0m
+
+   rm /tmp/some-test-file-doesnotexist
+   [37mRemove test file[39m
+
+ Do you want to proceed?
+ [94m❯[39m [37m1. [94mYes[39m
+   [37m2. [39mYes, and always allow access to [1mtmp[0m/ from this project
+   [37m3. [39mNo
+
+ [37mEsc to cancel · Tab to amend · ctrl+e to explain[39m

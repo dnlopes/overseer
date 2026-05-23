@@ -1,0 +1,50 @@
+
+[91m╭───[39m [91mClaude Code[39m [37mv2.1.139[39m [91m─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[39m                                                    [2m[91m│[0m [1m[91mTips for getting started[0m                                                                                                                        [91m│
+│[39m                 [1mWelcome back David![0m                [2m[91m│[0m Run /init to create a CLAUDE.md file with instructions for Claude                                                                               [91m│
+│[39m                                                    [2m[91m│[0m [91m───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m [91m│
+│[39m                      [91m ▐[40m▛███▜[49m▌[39m                      [2m[91m│[0m [1m[91mWhat's new[0m                                                                                                                                      [91m│
+│[39m                      [91m▝▜[40m█████[49m▛▘[39m                     [2m[91m│[0m Added `claude agents --json` to list live Claude sessions as JSON for scripting (tmux-resurrect, status bars, session pickers)                  [91m│
+│[39m                      [91m  ▘▘ ▝▝  [39m                     [2m[91m│[0m Added `agent_id` and `parent_agent_id` attributes to `claude_code.tool` OTEL spans, and fixed trace parenting so background subagent spans nes… [91m│
+│[39m [37mOpus 4.7 (1M context) with xh… · API Usage Billing[39m [2m[91m│[0m Status line JSON input now includes GitHub repo and PR information when detected                                                                [91m│
+│[39m [37m · Outsystems[39m                                      [2m[91m│[0m [3m[37m/release-notes for more[0m                                                                                                                         [91m│
+│[39m   [37m~/.config/overseer-personal/worktrees/7208a750[39m   [2m[91m│[0m                                                                                                                                                 [91m│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+[37m[100m❯ [97mWhat is 2+2? Just say the number, nothing else.[39m
+
+[97m[49m⏺[39m 4
+
+[37m✻[39m [37mChurned for 2s[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[37m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m❯ [7m [0m
+[37m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [37mPR[39m [4m[93m]8;id=1y206ja;https://github.com/dnlopes/overseer/pull/11\#11[0m]8;;\
