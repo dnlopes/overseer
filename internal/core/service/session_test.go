@@ -51,7 +51,7 @@ func newTestSessionService(
 	git domain.GitAdapter,
 	logger *slog.Logger,
 ) *SessionService {
-	launcher, _ := domain.NewLauncher("OpenCode", "opencode")
+	launcher, _ := domain.NewLauncher("OpenCode", "opencode", domain.AgentTypeOpenCode)
 	editor, _ := domain.NewEditor("True", "true")
 	return NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), launcher, editor, logger)
 }
@@ -1157,7 +1157,7 @@ func TestSessionService_OpenEditor_NoSessionCommandAndNoDefaultEditor_ReturnsSen
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
 
-	launcher, _ := domain.NewLauncher("OpenCode", "opencode")
+	launcher, _ := domain.NewLauncher("OpenCode", "opencode", domain.AgentTypeOpenCode)
 	svc := NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), launcher, domain.Editor{}, testLogger())
 	_, err := svc.OpenEditor(context.Background(), OpenEditorRequest{ID: sess.ID})
 

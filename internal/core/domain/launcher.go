@@ -10,9 +10,10 @@ const launcherDisplayNameMaxLen = 100
 type Launcher struct {
 	DisplayName string
 	Command     string
+	AgentType   AgentType
 }
 
-func NewLauncher(displayName, command string) (Launcher, error) {
+func NewLauncher(displayName, command string, agentType AgentType) (Launcher, error) {
 	displayName = strings.TrimSpace(displayName)
 	command = strings.TrimSpace(command)
 
@@ -25,15 +26,19 @@ func NewLauncher(displayName, command string) (Launcher, error) {
 	if command == "" {
 		return Launcher{}, ErrLauncherEmptyCommand
 	}
+	if agentType == "" {
+		return Launcher{}, ErrAgentTypeRequired
+	}
 
 	return Launcher{
 		DisplayName: displayName,
 		Command:     command,
+		AgentType:   agentType,
 	}, nil
 }
 
 func (l Launcher) IsZero() bool {
-	return l.DisplayName == "" && l.Command == ""
+	return l.DisplayName == "" && l.Command == "" && l.AgentType == ""
 }
 
 var (

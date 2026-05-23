@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	yamlv3 "gopkg.in/yaml.v3"
@@ -31,6 +32,7 @@ type StorageConfig struct {
 type LauncherConfig struct {
 	DisplayName string `yaml:"displayName"`
 	Command     string `yaml:"command"`
+	AgentType   string `yaml:"agentType"`
 }
 
 type EditorConfig struct {
@@ -44,15 +46,28 @@ type LabelConfig struct {
 	Glyph string `yaml:"glyph"`
 }
 
+type AgentStatusConfig struct {
+	Enabled         bool                     `yaml:"enabled"`
+	RefreshInterval time.Duration            `yaml:"refreshInterval"`
+	Display         AgentStatusDisplayConfig `yaml:"display"`
+}
+
+type AgentStatusDisplayConfig struct {
+	SessionList  bool   `yaml:"sessionList"`
+	StatusBar    bool   `yaml:"statusBar"`
+	RowHighlight string `yaml:"rowHighlight"`
+}
+
 type Config struct {
-	Theme        string           `yaml:"theme"`
-	DisableEmoji bool             `yaml:"disableEmoji"`
-	Dashboard    DashboardConfig  `yaml:"dashboard"`
-	Logging      LoggingConfig    `yaml:"logging"`
-	Storage      StorageConfig    `yaml:"storage"`
-	Launchers    []LauncherConfig `yaml:"launchers"`
-	Editors      []EditorConfig   `yaml:"editors"`
-	Labels       []LabelConfig    `yaml:"labels"`
+	Theme        string            `yaml:"theme"`
+	DisableEmoji bool              `yaml:"disableEmoji"`
+	Dashboard    DashboardConfig   `yaml:"dashboard"`
+	Logging      LoggingConfig     `yaml:"logging"`
+	Storage      StorageConfig     `yaml:"storage"`
+	Launchers    []LauncherConfig  `yaml:"launchers"`
+	Editors      []EditorConfig    `yaml:"editors"`
+	Labels       []LabelConfig     `yaml:"labels"`
+	AgentStatus  AgentStatusConfig `yaml:"agentStatus"`
 }
 
 func Default() Config {
@@ -67,13 +82,22 @@ func Default() Config {
 		Logging: LoggingConfig{Level: "info"},
 		Storage: StorageConfig{DataDir: ""},
 		Launchers: []LauncherConfig{
-			{DisplayName: "OpenCode (default)", Command: "opencode"},
-			{DisplayName: "Claude Code (default)", Command: "claude"},
+			{DisplayName: "OpenCode (default)", Command: "opencode", AgentType: string(domain.AgentTypeOpenCode)},
+			{DisplayName: "Claude Code (default)", Command: "claude", AgentType: string(domain.AgentTypeClaudeCode)},
 		},
 		Editors: []EditorConfig{
 			{DisplayName: "VSCode (default)", Command: "code"},
 		},
 		Labels: defaultLabelConfigs(),
+		AgentStatus: AgentStatusConfig{
+			Enabled:         true,
+			RefreshInterval: 5 * time.Second,
+			Display: AgentStatusDisplayConfig{
+				SessionList:  true,
+				StatusBar:    true,
+				RowHighlight: "subtle",
+			},
+		},
 	}
 }
 
@@ -129,7 +153,16 @@ func (c Config) Validate() error {
 	}
 
 	for i, l := range c.Launchers {
-		if _, err := domain.NewLauncher(l.DisplayName, l.Command); err != nil {
+		displayName := strings.TrimSpace(l.DisplayName)
+		if displayName != "" {
+			if l.AgentType == "" {
+				return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: launchers[%d] %q: agentType is required (one of: claude-code, opencode)", i, displayName))
+			}
+			if !isKnownAgentType(l.AgentType) {
+				return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: launchers[%d] %q: unknown agentType %q (expected one of: claude-code, opencode)", i, displayName, l.AgentType))
+			}
+		}
+		if _, err := domain.NewLauncher(l.DisplayName, l.Command, domain.AgentType(l.AgentType)); err != nil {
 			return errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: launchers[%d]: %v", i, err))
 		}
 	}
@@ -153,6 +186,14 @@ func (c Config) Validate() error {
 	}
 
 	return nil
+}
+
+func isKnownAgentType(at string) bool {
+	switch domain.AgentType(at) {
+	case domain.AgentTypeClaudeCode, domain.AgentTypeOpenCode:
+		return true
+	}
+	return false
 }
 
 func hasTopLevelKey(data []byte, key string) bool {
@@ -193,7 +234,7 @@ func (c Config) PreviewRefreshDuration() (time.Duration, error) {
 func (c Config) DomainLaunchers() ([]domain.Launcher, error) {
 	out := make([]domain.Launcher, 0, len(c.Launchers))
 	for i, l := range c.Launchers {
-		launcher, err := domain.NewLauncher(l.DisplayName, l.Command)
+		launcher, err := domain.NewLauncher(l.DisplayName, l.Command, domain.AgentType(l.AgentType))
 		if err != nil {
 			return nil, errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: launchers[%d]: %v", i, err))
 		}
