@@ -27,7 +27,7 @@ func newTestDashboard(t *testing.T) Model {
 	projects := mocks.NewMockProjectRepository(t)
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
-	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode")
+	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode", domain.AgentTypeOpenCode)
 	defaultEditor, _ := domain.NewEditor("VSCode", "code")
 
 	sessSvc := service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, defaultEditor, slog.Default())
