@@ -35,7 +35,8 @@ type Session struct {
 	WorktreePath  string
 	AgentCommand  string
 	EditorCommand string
-	Label         string `json:",omitempty"`
+	AgentType     AgentType `json:",omitempty"`
+	Label         string    `json:",omitempty"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -165,6 +166,21 @@ func (s *Session) AssignEditorCommand(cmd string) error {
 	}
 
 	s.EditorCommand = cmd
+	s.UpdatedAt = time.Now()
+	return nil
+}
+
+// AssignAgentType sets the session's agent type — the discriminator the
+// status-detection registry uses to route a session to the right detector.
+// Empty values are rejected so the invariant "if AgentType is set, it is
+// routable" holds; the storage migration handles legacy sessions by
+// inferring or falling back to AgentTypeUnknown, which is still routable
+// (just resolves to no-detector → Unknown status).
+func (s *Session) AssignAgentType(t AgentType) error {
+	if t == "" {
+		return ErrAgentTypeRequired
+	}
+	s.AgentType = t
 	s.UpdatedAt = time.Now()
 	return nil
 }
