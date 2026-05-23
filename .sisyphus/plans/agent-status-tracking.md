@@ -812,7 +812,7 @@ agentStatus:
 - All tests pass with real Claude fixtures
 - Manual: run Overseer with a real Claude session, tail the log, observe correct status detection across all 4 transitions (idle → running → waiting → idle)
 
-**Status:** ⬜ NOT STARTED
+**Status:** ✅ DONE — 2026-05-23 — full `go test -race ./...` GREEN across all 22 packages; build exit 0; `lsp_diagnostics` clean on every changed file. Live integration test (`-tags=live_tmux`, `OVERSEER_LIVE_TMUX_ID=<uuid>-agent`) verified all four transitions against a real Claude Code session: idle → running ("matched \"esc to interrupt\"") → waiting ("matched \"Do you want to proceed?\"") → idle. Detector returns wrapped error on missing pane; service-level test confirms the service intercepts and reports Dead, keeping detectors ignorant of liveness as required by §4. Slice 2 carries a temporary `agent-status-debug` scheduler job that logs status at INFO every `refreshInterval` so detection is observable end-to-end; Slice 3 will replace it with the TUI-bound `AgentStatusesUpdatedMsg` job.
 
 ---
 
