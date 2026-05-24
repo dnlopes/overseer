@@ -23,6 +23,7 @@ type Model struct {
 	session         *domain.Session
 	prCache         map[uuid.UUID]shared.PRStatusUpdatedMsg
 	projectBranches map[uuid.UUID]string
+	projectNames    map[uuid.UUID]string
 }
 
 func New(s *styles.Styles) Model {
@@ -30,6 +31,7 @@ func New(s *styles.Styles) Model {
 		styles:          s,
 		prCache:         make(map[uuid.UUID]shared.PRStatusUpdatedMsg),
 		projectBranches: make(map[uuid.UUID]string),
+		projectNames:    make(map[uuid.UUID]string),
 	}
 }
 
@@ -73,6 +75,10 @@ func (m *Model) reconcileSession(sessions []domain.Session) {
 		}
 	}
 	m.session = nil
+}
+
+func (m *Model) SetProjectNames(names map[uuid.UUID]string) {
+	m.projectNames = names
 }
 
 func (m *Model) SetSize(width, height int) {
