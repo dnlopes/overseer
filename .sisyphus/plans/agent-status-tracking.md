@@ -820,6 +820,14 @@ agentStatus:
 
 **Goal:** Status becomes visible to the user. Claude-only (OpenCode still unknown).
 
+**Starting state from Slice 2** (already wired in `cmd/overseer/main.go`):
+
+- `agentStatusRegistry` (a `*registry.Registry`) holds the Claude Code pane detector. Reuse the variable; do not rename it.
+- `agentStatusSvc` (a `*service.AgentStatusService`) is constructed against the existing tmux adapter + session repo. Reuse this too.
+- A temporary `agent-status-debug` job (gated on `cfg.AgentStatus.Enabled`) calls `PollAll` every `cfg.AgentStatus.RefreshInterval` and logs each session's classified status at INFO. **Slice 3 deletes `buildAgentStatusDebugJob` and replaces it with `buildAgentStatusJob` (or similar) whose result handler returns `shared.AgentStatusesUpdatedMsg{Statuses: resp.Statuses, Err: err}` instead of logging.** The Bubble Tea / `shared.Request` wiring is identical to the debug job — only the wrap function changes.
+- The opt-in `detector_live_test.go` (`-tags=live_tmux`, `OVERSEER_LIVE_TMUX_ID=<uuid>-agent`) is the easiest way to sanity-check live detection without spinning up the whole TUI; useful while iterating on glyph/colour choices.
+- The fixture-capture methodology is documented in commit `15a3639`'s message and `internal/adapters/secondary/agentstatus/claudecode/testdata/`. Use the same approach if you want extra fixtures for golden-file rendering tests.
+
 **Scope:**
 - `internal/adapters/primary/tui/shared/messages.go` — add `AgentStatusesUpdatedMsg`
 - `internal/adapters/primary/tui/styles/glyphs.go` — extend `Glyphs` (both branches)
@@ -890,6 +898,8 @@ agentStatus:
 - **Bounded concurrency (8 goroutines)** in `PollAll` prevents tmux subprocess flooding on systems with many sessions. Tune later if needed.
 - **Glyph rendering width** — `🟢` and `❔` are double-width in most terminal fonts; `●`, `◐`, `■`, `○`, `?` are single-width. Lipgloss handles width correctly, but the layout math in `renderSessionNode` reads widths via `lipgloss.Width(body)` so it'll Just Work. Don't hardcode +1.
 - **Existing `Label` field is untouched** — it's user-assigned workflow state ("WIP", "done"), totally orthogonal to agent runtime status. Both coexist in the row.
+- **`buildAgentStatusDebugJob` in `cmd/overseer/main.go` is Slice 2 scaffolding.** Slice 3 deletes it (along with the `log/slog` import if it becomes unused) and replaces it with the TUI-bound job. Do **not** carry both jobs — that would double the poll rate.
+- **Audit every theme file when adding palette fields.** Adding `StatusRunningFg`/`StatusRunningBg`/etc. to `Theme` without populating every concrete theme (`theme_dark.go`, `theme_light.go`, `theme_dracula.go`, …) breaks the build. Run `git ls-files internal/adapters/primary/tui/styles/theme_*.go` to enumerate.
 
 ---
 
@@ -927,6 +937,13 @@ These were intentionally not decided in this plan. Address when/if needed:
 | Job scheduler | `internal/adapters/primary/tui/jobs/scheduler.go` |
 | Reference job (PR status pattern to mirror) | `cmd/overseer/main.go` (search `prJob`) |
 | Wiring entry point | `cmd/overseer/main.go` |
+| Agent status domain types & ports (Slice 1) | `internal/core/domain/agent_status.go` |
+| Agent status service (Slice 2) | `internal/core/service/agent_status.go` |
+| Detector registry (Slice 2) | `internal/adapters/secondary/agentstatus/registry/registry.go` |
+| Claude Code pane detector (Slice 2) | `internal/adapters/secondary/agentstatus/claudecode/detector.go` |
+| Shared detector helpers (Slice 2) | `internal/adapters/secondary/agentstatus/shared/{ansi.go,pane.go}` |
+| Debug job to replace in Slice 3 | `cmd/overseer/main.go` (search `buildAgentStatusDebugJob`) |
+| Opt-in live integration test | `internal/adapters/secondary/agentstatus/claudecode/detector_live_test.go` |
 
 ---
 
