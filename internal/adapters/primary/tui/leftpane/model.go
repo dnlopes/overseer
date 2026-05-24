@@ -40,6 +40,7 @@ func (m Model) Init() tea.Cmd {
 
 func (m *Model) SetProjectNameLookup(names map[uuid.UUID]string) {
 	m.sessions.SetProjectNames(names)
+	m.sessionDetails.SetProjectNames(names)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
