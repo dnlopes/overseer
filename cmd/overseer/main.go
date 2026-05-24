@@ -14,6 +14,7 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/claudecode"
+	"github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/opencode"
 	agentstatusregistry "github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/registry"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/git"
 	githubcli "github.com/dnlopes/overseer/internal/adapters/secondary/github"
@@ -96,6 +97,7 @@ func main() {
 
 	agentStatusRegistry := agentstatusregistry.New()
 	agentStatusRegistry.Register(claudecode.NewPaneDetector(tmuxAdapter))
+	agentStatusRegistry.Register(opencode.NewPaneDetector(tmuxAdapter))
 	agentStatusSvc := service.NewAgentStatusService(store.Sessions(), tmuxAdapter, agentStatusRegistry, log)
 
 	prJob := buildPullRequestJob(sessionSvc, projectSvc, prSvc)
