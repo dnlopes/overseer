@@ -1,33 +1,27 @@
 package dashboard
 
 import (
-	"os"
+	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
+	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
+	"github.com/dnlopes/overseer/internal/core/domain"
 )
 
-// StatusModel renders the bottom-right status segment: workdir, branch, PR, agent.
 type StatusModel struct {
-	workdir     string
-	branch      string
-	prStatus    string
-	agentStatus string
-	styles      *styles.Styles
-	width       int
+	aggregate map[domain.AgentStatusKind]int
+	styles    *styles.Styles
+	width     int
 }
 
 func newStatus(s *styles.Styles) StatusModel {
-	wd, _ := os.Getwd()
 	return StatusModel{
-		workdir:     wd,
-		branch:      "stubbed",
-		prStatus:    "—",
-		agentStatus: "idle",
-		styles:      s,
-		width:       80,
+		aggregate: map[domain.AgentStatusKind]int{},
+		styles:    s,
+		width:     80,
 	}
 }
 
@@ -35,40 +29,44 @@ func (m StatusModel) Init() tea.Cmd {
 	return nil
 }
 
+func (m *StatusModel) SetSize(width, _ int) {
+	m.width = width
+}
+
 func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if ws, ok := msg.(tea.WindowSizeMsg); ok {
-		m.width = ws.Width
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+	case shared.AgentStatusesUpdatedMsg:
+		if msg.Err != nil {
+			return m, nil
+		}
+		agg := make(map[domain.AgentStatusKind]int, 5)
+		for _, st := range msg.Statuses {
+			agg[st.Kind]++
+		}
+		m.aggregate = agg
 	}
 	return m, nil
 }
 
-func (m StatusModel) View() tea.View {
-	branchSeg := m.styles.StatusSegment.Default.Render(m.branch)
-	prSeg := m.styles.StatusSegment.Default.Render(m.prStatus)
-	agentSeg := m.styles.StatusSegment.Highlight.Render(m.agentStatus)
-
-	trailing := branchSeg + prSeg + agentSeg
-
-	wdSegPadWidth := lipgloss.Width(m.styles.StatusSegment.Default.Render(""))
-	available := m.width - lipgloss.Width(trailing) - wdSegPadWidth
-	available = max(available, 0)
-
-	wd := truncate(m.workdir, available)
-	wdSeg := m.styles.StatusSegment.Default.Render(wd)
-
-	return tea.NewView(wdSeg + trailing)
+var statusBarOrder = []domain.AgentStatusKind{
+	domain.AgentStatusRunning,
+	domain.AgentStatusWaiting,
+	domain.AgentStatusDead,
+	domain.AgentStatusIdle,
+	domain.AgentStatusUnknown,
 }
 
-func truncate(s string, maxWidth int) string {
-	if lipgloss.Width(s) <= maxWidth {
-		return s
+func (m StatusModel) View() tea.View {
+	parts := make([]string, 0, len(statusBarOrder))
+	for _, kind := range statusBarOrder {
+		count := m.aggregate[kind]
+		if count == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s %d", m.styles.Glyphs.AgentStatus(kind), count))
 	}
-	if maxWidth < 3 {
-		return "..."
-	}
-	runes := []rune(s)
-	for len(runes) > 0 && lipgloss.Width(string(runes)) > maxWidth-3 {
-		runes = runes[:len(runes)-1]
-	}
-	return string(runes) + "..."
+	content := strings.Join(parts, " · ")
+	return tea.NewView(m.styles.StatusBar.Width(m.width).Render(content))
 }

@@ -90,3 +90,78 @@ func TestDashboard_SessionSelectionClearedMsg_ForwardsToInspector(t *testing.T) 
 		t.Errorf("inspector should show 'Select a session to preview' after SessionSelectionClearedMsg; the message was not forwarded to the inspector. View:\n%s", after)
 	}
 }
+
+func TestDashboard_AgentStatusesUpdatedMsg_RendersAggregateInStatusBar(t *testing.T) {
+	m := newTestDashboardNoEmoji(t)
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = updated.(Model)
+
+	statuses := map[uuid.UUID]domain.AgentStatus{
+		uuid.New(): {Kind: domain.AgentStatusRunning},
+		uuid.New(): {Kind: domain.AgentStatusRunning},
+		uuid.New(): {Kind: domain.AgentStatusRunning},
+		uuid.New(): {Kind: domain.AgentStatusWaiting},
+		uuid.New(): {Kind: domain.AgentStatusDead},
+	}
+
+	updated, _ = m.Update(shared.AgentStatusesUpdatedMsg{Statuses: statuses})
+	m = updated.(Model)
+
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"● 3", "◐ 1", "■ 1"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("status bar missing aggregate %q in view:\n%s", want, view)
+		}
+	}
+}
+
+func TestDashboard_AgentStatusesUpdatedMsg_OmitsZeroCounts(t *testing.T) {
+	m := newTestDashboardNoEmoji(t)
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = updated.(Model)
+
+	statuses := map[uuid.UUID]domain.AgentStatus{
+		uuid.New(): {Kind: domain.AgentStatusRunning},
+	}
+
+	updated, _ = m.Update(shared.AgentStatusesUpdatedMsg{Statuses: statuses})
+	m = updated.(Model)
+
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "● 1") {
+		t.Errorf("status bar missing '● 1': %s", view)
+	}
+	for _, glyph := range []string{"◐ 0", "■ 0", "○ 0", "? 0"} {
+		if strings.Contains(view, glyph) {
+			t.Errorf("status bar should omit zero-count segments, found %q in view:\n%s", glyph, view)
+		}
+	}
+}
+
+func newTestDashboardNoEmoji(t *testing.T) Model {
+	t.Helper()
+
+	repo := mocks.NewMockSessionRepository(t)
+	projects := mocks.NewMockProjectRepository(t)
+	tmux := mocks.NewMockTmuxAdapter(t)
+	git := mocks.NewMockGitAdapter(t)
+	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode", domain.AgentTypeOpenCode)
+	defaultEditor, _ := domain.NewEditor("VSCode", "code")
+
+	sessSvc := service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, defaultEditor, slog.Default())
+	projSvc := service.NewProjectService(projects, git, slog.Default())
+
+	return New(
+		styles.NewWithTheme("dark", true),
+		*sessSvc,
+		*projSvc,
+		jobs.Model{},
+		[]domain.Launcher{defaultLauncher},
+		[]domain.Editor{defaultEditor},
+		domain.DefaultLabels,
+		60, 15,
+		500*time.Millisecond,
+	)
+}

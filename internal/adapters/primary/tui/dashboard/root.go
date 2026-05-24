@@ -27,6 +27,7 @@ const (
 	TitleBarHeight           = 1
 	TitleBarGap              = 1
 	HelpBarHeight            = 1
+	StatusBarHeight          = 1
 )
 
 type popupKind int
@@ -49,6 +50,7 @@ type Model struct {
 	titlebar                TitleBarModel
 	leftPane                leftpane.Model
 	inspector               inspector.Model
+	status                  StatusModel
 	helpBar                 shared.HelpBarModel
 	createForm              sessionui.CreateFormModel
 	deleteForm              sessionui.DeleteFormModel
@@ -93,6 +95,7 @@ func New(
 		titlebar:                newTitlebar(styles, "overseer"),
 		leftPane:                left,
 		inspector:               inspector.New(styles, sessionsService, previewRefreshInterval),
+		status:                  newStatus(styles),
 		helpBar:                 shared.NewHelpBarModel(styles, slices.Concat(sessionsKeyBindings, inspectorKeyBindings, generalKeyBindings)),
 		scheduler:               scheduler,
 		sessionsService:         sessionsService,
@@ -113,6 +116,7 @@ func (m Model) Init() tea.Cmd {
 		m.titlebar.Init(),
 		m.leftPane.Init(),
 		m.inspector.Init(),
+		m.status.Init(),
 		m.helpBar.Init(),
 		m.scheduler.Init(),
 		m.loadProjects(),
@@ -287,6 +291,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.leftPane, cmd = shared.UpdateModel(m.leftPane, msg)
 		return m, cmd
+	case shared.AgentStatusesUpdatedMsg:
+		return m, shared.Broadcast(msg,
+			shared.Forward(&m.leftPane),
+			shared.Forward(&m.status),
+		)
 	}
 
 	if m.activePopup != popupNone {
@@ -479,17 +488,19 @@ func (m Model) View() tea.View {
 
 	titlebarView := m.titlebar.View().Content
 	titlebarHeight := max(lipgloss.Height(titlebarView), 1)
+	statusView := m.status.View().Content
+	statusHeight := max(lipgloss.Height(statusView), 1)
 	helpView := m.helpBar.View().Content
 	helpHeight := max(lipgloss.Height(helpView), 1)
 
-	bodyHeight := max(m.height-titlebarHeight-TitleBarGap-helpHeight, 1)
+	bodyHeight := max(m.height-titlebarHeight-TitleBarGap-statusHeight-helpHeight, 1)
 	leftWidth := m.width * SessionsListWidthPercent / 100
 	rightWidth := m.width - leftWidth
 
 	left := fit(m.styles, m.leftPane.View().Content, leftWidth, bodyHeight)
 	right := fit(m.styles, m.inspector.View().Content, rightWidth, bodyHeight)
 	body := fit(m.styles, lipgloss.JoinHorizontal(lipgloss.Top, left, right), m.width, bodyHeight)
-	full := lipgloss.JoinVertical(lipgloss.Left, titlebarView, "", body, helpView)
+	full := lipgloss.JoinVertical(lipgloss.Left, titlebarView, "", body, statusView, helpView)
 
 	return tea.NewView(full)
 }
@@ -515,10 +526,11 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	leftWidth := m.width * SessionsListWidthPercent / 100
 	rightWidth := m.width - leftWidth
-	bodyHeight := max(m.height-TitleBarHeight-TitleBarGap-HelpBarHeight, 1)
+	bodyHeight := max(m.height-TitleBarHeight-TitleBarGap-StatusBarHeight-HelpBarHeight, 1)
 
 	m.leftPane.SetSize(leftWidth, bodyHeight)
 	m.inspector.SetSize(rightWidth, bodyHeight)
+	m.status.SetSize(m.width, StatusBarHeight)
 	m.helpBar.SetSize(m.width, HelpBarHeight)
 	m.titlebar.SetSize(m.width, TitleBarHeight)
 	return m, nil
