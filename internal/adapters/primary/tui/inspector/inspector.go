@@ -54,6 +54,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case shared.SessionSelectedMsg:
 		m.sessionID = msg.Session.ID
+		m.activeIx = 0
 		for i := range m.views {
 			m.views[i].SetSession(msg.Session.ID)
 		}
