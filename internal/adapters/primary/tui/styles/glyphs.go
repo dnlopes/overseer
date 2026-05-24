@@ -1,5 +1,7 @@
 package styles
 
+import "github.com/dnlopes/overseer/internal/core/domain"
+
 type Glyphs struct {
 	Branch        string
 	ProjectMode   string
@@ -21,6 +23,11 @@ type Glyphs struct {
 	LabelReady    string
 	LabelDone     string
 	LabelDraft    string
+	StatusRunning string
+	StatusWaiting string
+	StatusIdle    string
+	StatusDead    string
+	StatusUnknown string
 }
 
 func NewGlyphs(disableEmoji bool) Glyphs {
@@ -46,6 +53,11 @@ func NewGlyphs(disableEmoji bool) Glyphs {
 			LabelReady:    "◆",
 			LabelDone:     "✓",
 			LabelDraft:    "◌",
+			StatusRunning: "●",
+			StatusWaiting: "◐",
+			StatusIdle:    "○",
+			StatusDead:    "■",
+			StatusUnknown: "?",
 		}
 	}
 	return Glyphs{
@@ -69,6 +81,11 @@ func NewGlyphs(disableEmoji bool) Glyphs {
 		LabelTesting:  "🧪",
 		LabelReady:    "🚀",
 		LabelDone:     "✅",
+		StatusRunning: "🟢",
+		StatusWaiting: "🟡",
+		StatusIdle:    "⚪",
+		StatusDead:    "🔴",
+		StatusUnknown: "❔",
 	}
 }
 
@@ -86,4 +103,19 @@ func (g Glyphs) LabelGlyph(code string) string {
 		return g.LabelDone
 	}
 	return ""
+}
+
+func (g Glyphs) AgentStatus(kind domain.AgentStatusKind) string {
+	switch kind {
+	case domain.AgentStatusRunning:
+		return g.StatusRunning
+	case domain.AgentStatusWaiting:
+		return g.StatusWaiting
+	case domain.AgentStatusIdle:
+		return g.StatusIdle
+	case domain.AgentStatusDead:
+		return g.StatusDead
+	default:
+		return g.StatusUnknown
+	}
 }
