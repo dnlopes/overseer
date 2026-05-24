@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"time"
 
@@ -102,7 +101,7 @@ func main() {
 	prJob := buildPullRequestJob(sessionSvc, projectSvc, prSvc)
 	schedulerJobs := []jobs.Job{prJob}
 	if cfg.AgentStatus.Enabled {
-		schedulerJobs = append(schedulerJobs, buildAgentStatusDebugJob(agentStatusSvc, cfg.AgentStatus.RefreshInterval, log))
+		schedulerJobs = append(schedulerJobs, buildAgentStatusJob(agentStatusSvc, cfg.AgentStatus.RefreshInterval))
 	}
 	scheduler := jobs.New(schedulerJobs...)
 
@@ -154,15 +153,9 @@ func buildPullRequestJob(
 	}
 }
 
-// buildAgentStatusDebugJob returns a scheduler job that calls
-// AgentStatusService.PollAll on every tick and logs each session's
-// status at INFO. This is the Slice-2 deliverable: status detection is
-// proven end-to-end via the log, with no TUI wiring yet. Slice 3
-// replaces this job with one that emits shared.AgentStatusesUpdatedMsg
-// into the Bubble Tea event loop for rendering.
-func buildAgentStatusDebugJob(svc *service.AgentStatusService, interval time.Duration, log *slog.Logger) jobs.Job {
+func buildAgentStatusJob(svc *service.AgentStatusService, interval time.Duration) jobs.Job {
 	return jobs.Job{
-		ID:       "agent-status-debug",
+		ID:       "agent-status-refresh",
 		Interval: interval,
 		Run: func() tea.Cmd {
 			return shared.Request(
@@ -170,19 +163,7 @@ func buildAgentStatusDebugJob(svc *service.AgentStatusService, interval time.Dur
 					return svc.PollAll(ctx, service.PollAllAgentStatusesRequest{})
 				},
 				func(resp service.PollAllAgentStatusesResponse, err error) tea.Msg {
-					if err != nil {
-						log.Warn("agent-status-debug poll failed", "error", err)
-						return nil
-					}
-					for id, st := range resp.Statuses {
-						log.Info("agent-status-debug",
-							"session_id", id.String(),
-							"kind", string(st.Kind),
-							"source", st.Source,
-							"reason", st.Reason,
-						)
-					}
-					return nil
+					return shared.AgentStatusesUpdatedMsg{Statuses: resp.Statuses, Err: err}
 				},
 			)
 		},
