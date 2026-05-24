@@ -856,17 +856,43 @@ agentStatus:
 
 **Goal:** Multi-agent functionality complete.
 
-**Scope:**
-- `internal/adapters/secondary/agentstatus/opencode/{detector.go,patterns.go,detector_test.go}` (new)
-- Capture real OpenCode pane fixtures (same process as Claude in Slice 2)
-- `cmd/overseer/main.go` — `registry.Register(opencode.NewPaneDetector(tmuxAdapter))`
+**Starting state from Slice 3** (already wired in `cmd/overseer/main.go`):
 
-**Tests:**
-- `TestOpenCodeDetector_*` covering all 4 states with real fixtures
+- The TUI render pipeline is fully live. Whenever `agentStatusSvc.PollAll` resolves a `domain.AgentStatusKind` for a session, the TUI will render the matching glyph + tint in the session list and bump the count in the bottom-bar aggregate. Slice 4 does **not** need to touch any TUI code.
+- `agentStatusRegistry` (a `*registry.Registry`) currently holds the Claude Code pane detector at `cmd/overseer/main.go:99`. Slice 4 adds **one line** alongside it: `agentStatusRegistry.Register(opencode.NewPaneDetector(tmuxAdapter))`. The service routes by `sess.AgentType`, which is already populated correctly (Slice 1's `LauncherConfig.agentType: "opencode"` flows through to `Session.AgentType` at creation time and on legacy-session inference).
+- The Slice 2 `agent-status-debug` job is gone. Slice 3 replaced it with `buildAgentStatusJob` returning `shared.AgentStatusesUpdatedMsg{Statuses: resp.Statuses, Err: err}`. Slice 4 does not touch the job.
+- The Claude Code detector at `internal/adapters/secondary/agentstatus/claudecode/` is the **structural template** for the OpenCode detector. Mirror its layout exactly: `detector.go` (the `PaneDetector` struct, `AgentType()`, `Detect()`, `classify()` and matchers), `patterns.go` (signal constants with rationale comments), `detector_test.go` (fixture-driven table tests across all 4 states + empty-pane Unknown + tmux-error propagation + port satisfaction check). The compile-time port check `var _ domain.AgentStatusDetector = (*PaneDetector)(nil)` belongs at the bottom of `detector.go`.
+- Shared helpers exist and MUST be reused — do NOT re-implement: `internal/adapters/secondary/agentstatus/shared/ansi.go::StripANSI` strips ANSI escape codes (lipgloss-aware), `internal/adapters/secondary/agentstatus/shared/pane.go::LastNonEmptyLines(text, n)` returns the last `n` non-empty lines for the scan window. Claude Code uses `scanWindow = 30`; OpenCode should pick the same unless fixtures prove otherwise.
+- Source tag convention: Slice 2's Claude Code detector tags its statuses with `Source: "claude-code/pane-parser"`. Slice 4's OpenCode detector MUST use `Source: "opencode/pane-parser"` so logs / debugging output remain disambiguable.
+- Fixture-capture methodology is documented in commit `15a3639` and `internal/adapters/secondary/agentstatus/claudecode/testdata/`. To capture real OpenCode panes:
+  1. Inside Overseer, create a session that launches OpenCode (the default OpenCode launcher works).
+  2. Reach each target state through real interaction (idle prompt, mid-prompt run, approval modal, etc.).
+  3. From outside Overseer: `tmux capture-pane -p -e -t <session-uuid>-agent: > internal/adapters/secondary/agentstatus/opencode/testdata/<state>_<n>.txt`. Commit the fixtures alongside the test.
+- The pattern guesses in plan §7 (`"esc to interrupt"`, `"continue?"`, `"proceed?"`, `"enter to select"`, `"esc to cancel"`, `">"` / `"opencode>"`) are **starting hypotheses, not facts**. Confirm each one against a captured fixture; OpenCode's bottom status bar may differ from Claude's. Falsify and replace any signal that does not match the real captures.
+- Opt-in live integration test mirrors Claude's: add `internal/adapters/secondary/agentstatus/opencode/detector_live_test.go` guarded by `//go:build live_tmux`. Same env-var protocol: `OVERSEER_LIVE_TMUX_ID=<session-uuid>-agent go test -tags=live_tmux ./internal/adapters/secondary/agentstatus/opencode/ -run TestPaneDetector_Detect_LiveTmux -v`. Useful as a sanity check while iterating on patterns.
+- `cmd/overseer/main.go` already imports `claudecode` at line 17. Add an `opencode` import next to it. The variable name `agentStatusRegistry` is in scope at the registration site — do not rename it.
+
+**Scope:**
+- `internal/adapters/secondary/agentstatus/opencode/{detector.go,patterns.go,detector_test.go,detector_live_test.go}` (new)
+- `internal/adapters/secondary/agentstatus/opencode/testdata/*.txt` (new — real captured fixtures)
+- `cmd/overseer/main.go` — add `agentStatusRegistry.Register(opencode.NewPaneDetector(tmuxAdapter))` + `opencode` import
+
+**Tests (TDD — RED first):**
+- `TestPaneDetector_AgentType_ReturnsOpenCode` — port shape sanity check.
+- `TestPaneDetector_Detect_RunningFixtures` — table test, one entry per captured running fixture.
+- `TestPaneDetector_Detect_WaitingFixtures` — table test, one entry per captured waiting fixture.
+- `TestPaneDetector_Detect_IdleFixtures` — table test, one entry per captured idle fixture.
+- `TestPaneDetector_Detect_EmptyPane_ReturnsUnknown` — mocked tmux returns `""`.
+- `TestPaneDetector_Detect_TmuxError_PropagatesAsError` — mocked tmux returns an error; assert `errors.Is(err, wantErr)`.
+- `TestPaneDetector_Detect_SatisfiesDomainPort` — compile-time check.
+- (opt-in, `//go:build live_tmux`) `TestPaneDetector_Detect_LiveTmux` — drives the real tmux adapter against a session pointed at by `OVERSEER_LIVE_TMUX_ID`.
 
 **Acceptance criteria:**
 - `go build ./...` clean
-- Manual: launch one Claude session and one OpenCode session simultaneously. Both detect correctly. Status bar aggregates both.
+- `go test -race -count=1 ./...` GREEN across all packages (the new opencode package included)
+- `lsp_diagnostics` clean on every changed file
+- At least 2 fixtures per state (Running, Waiting, Idle) committed under `testdata/` and exercised by table tests
+- Manual: launch one Claude Code session and one OpenCode session simultaneously inside Overseer. Confirm both rows render the correct status glyph + tint, and the status bar aggregate counts both. Verify with both `disableEmoji: true` and `false`.
 
 **Status:** ⬜ NOT STARTED
 
@@ -900,6 +926,9 @@ agentStatus:
 - **Existing `Label` field is untouched** — it's user-assigned workflow state ("WIP", "done"), totally orthogonal to agent runtime status. Both coexist in the row.
 - **`buildAgentStatusDebugJob` in `cmd/overseer/main.go` is Slice 2 scaffolding.** Slice 3 deletes it (along with the `log/slog` import if it becomes unused) and replaces it with the TUI-bound job. Do **not** carry both jobs — that would double the poll rate.
 - **Audit every theme file when adding palette fields.** Adding `StatusRunningFg`/`StatusRunningBg`/etc. to `Theme` without populating every concrete theme (`theme_dark.go`, `theme_light.go`, `theme_dracula.go`, …) breaks the build. Run `git ls-files internal/adapters/primary/tui/styles/theme_*.go` to enumerate.
+- **Reuse `shared.StripANSI` and `shared.LastNonEmptyLines` (Slice 2 helpers).** A new per-agent detector that re-implements ANSI stripping or last-N-line extraction is a smell — those helpers are package-shared on purpose. Tests live in `agentstatus/shared/` and any change there affects every detector.
+- **Per-agent source tags.** Each detector tags its emitted `AgentStatus.Source` with `<agent-key>/pane-parser` (e.g. `claude-code/pane-parser`, `opencode/pane-parser`). Keep tags collision-free across agents — the service uses `service/...` tags for its own outputs (`service/tmux-liveness`, `service/registry`, `service/detector-error`) so log filtering stays meaningful.
+- **Stale dashboard golden files in `internal/adapters/primary/tui/dashboard/testdata/`** (`TestDashboard_Default80x24.golden`, etc.) reference the pre-Slice-3 layout. They are **orphans — no test reads them** (`grep -rn "golden.RequireEqual" internal/` is empty). Leave them alone unless explicitly asked; touching them is out of scope for any agent-status slice.
 
 ---
 
@@ -940,10 +969,18 @@ These were intentionally not decided in this plan. Address when/if needed:
 | Agent status domain types & ports (Slice 1) | `internal/core/domain/agent_status.go` |
 | Agent status service (Slice 2) | `internal/core/service/agent_status.go` |
 | Detector registry (Slice 2) | `internal/adapters/secondary/agentstatus/registry/registry.go` |
-| Claude Code pane detector (Slice 2) | `internal/adapters/secondary/agentstatus/claudecode/detector.go` |
-| Shared detector helpers (Slice 2) | `internal/adapters/secondary/agentstatus/shared/{ansi.go,pane.go}` |
-| Debug job to replace in Slice 3 | `cmd/overseer/main.go` (search `buildAgentStatusDebugJob`) |
-| Opt-in live integration test | `internal/adapters/secondary/agentstatus/claudecode/detector_live_test.go` |
+| Claude Code pane detector (Slice 2 — STRUCTURAL TEMPLATE for Slice 4) | `internal/adapters/secondary/agentstatus/claudecode/detector.go` |
+| Claude Code patterns (template for opencode/patterns.go) | `internal/adapters/secondary/agentstatus/claudecode/patterns.go` |
+| Claude Code fixture-driven tests (template for opencode/detector_test.go) | `internal/adapters/secondary/agentstatus/claudecode/detector_test.go` |
+| Claude Code real-pane fixtures (template for opencode/testdata/) | `internal/adapters/secondary/agentstatus/claudecode/testdata/` |
+| Shared detector helpers (Slice 2 — reuse, do not duplicate) | `internal/adapters/secondary/agentstatus/shared/{ansi.go,pane.go}` |
+| Agent status TUI message (Slice 3) | `internal/adapters/primary/tui/shared/messages.go` (search `AgentStatusesUpdatedMsg`) |
+| Status glyphs + theme palette (Slice 3) | `internal/adapters/primary/tui/styles/glyphs.go`, `theme*.go`, `styles.go` |
+| Session-row status rendering (Slice 3) | `internal/adapters/primary/tui/session/model.go` (search `renderSessionNode`, `statusRowStyle`) |
+| Status-bar aggregate model (Slice 3) | `internal/adapters/primary/tui/dashboard/status.go` |
+| Dashboard wiring of status bar (Slice 3) | `internal/adapters/primary/tui/dashboard/root.go` (search `m.status`) |
+| TUI-bound refresh job (Slice 3) | `cmd/overseer/main.go` (search `buildAgentStatusJob` / `agent-status-refresh`) |
+| Opt-in live integration test (template) | `internal/adapters/secondary/agentstatus/claudecode/detector_live_test.go` |
 
 ---
 
