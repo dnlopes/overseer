@@ -1006,6 +1006,67 @@ func TestSessionService_PreviewSession_TmuxSessionMissing_ReturnsNotReady(t *tes
 	}
 }
 
+func TestSessionService_KillPreviewSession_Shell(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.KillPreviewSession(context.Background(), KillPreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
+
+	if err != nil {
+		t.Fatalf("KillPreviewSession() error = %v, want nil", err)
+	}
+}
+
+func TestSessionService_KillPreviewSession_Agent(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()+"-agent").
+		Return(domain.TmuxSession{ID: sess.ID.String() + "-agent"}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()+"-agent").Return(nil).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.KillPreviewSession(context.Background(), KillPreviewSessionRequest{ID: sess.ID, Kind: PreviewKindAgent})
+
+	if err != nil {
+		t.Fatalf("KillPreviewSession() error = %v, want nil", err)
+	}
+}
+
+func TestSessionService_KillPreviewSession_AlreadyGone(t *testing.T) {
+	sess := testutil.MakeSession("alpha", uuid.New())
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+		Return(domain.TmuxSession{}, domain.ErrTmuxSessionNotFound).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.KillPreviewSession(context.Background(), KillPreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
+
+	if err != nil {
+		t.Fatalf("KillPreviewSession() error = %v, want nil for already-gone session", err)
+	}
+}
+
+func TestSessionService_KillPreviewSession_SessionNotFound(t *testing.T) {
+	missingID := uuid.New()
+	repo, projects, tmux, git := newSessionMocks(t)
+	repo.EXPECT().Get(mock.Anything, missingID).
+		Return(domain.Session{}, domain.ErrSessionNotFound).Once()
+
+	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
+	_, err := svc.KillPreviewSession(context.Background(), KillPreviewSessionRequest{ID: missingID, Kind: PreviewKindShell})
+
+	if !errors.Is(err, domain.ErrSessionNotFound) {
+		t.Fatalf("KillPreviewSession() error = %v, want %v", err, domain.ErrSessionNotFound)
+	}
+}
+
 func pinWorktreeRoot(t *testing.T) string {
 	t.Helper()
 	t.Setenv("XDG_DATA_HOME", t.TempDir())

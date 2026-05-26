@@ -73,7 +73,7 @@ func (m DeleteFormModel) View() tea.View {
 	danger := m.styles.Danger
 
 	var b strings.Builder
-	b.WriteString(danger.Title.Render(m.styles.Glyphs.Warning + " Delete session"))
+	b.WriteString(danger.Title.Render("Delete session"))
 	b.WriteByte('\n')
 	b.WriteByte('\n')
 	b.WriteString(field.Label.Render("Session: "))

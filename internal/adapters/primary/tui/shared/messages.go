@@ -46,6 +46,10 @@ type SessionAttachedMsg struct{ Err error }
 
 type SessionEditorLaunchedMsg struct{ Err error }
 
+type PreviewSessionKilledMsg struct{ Err error }
+
+type KillPreviewPopupCloseMsg struct{}
+
 type SessionDeleteRequestedMsg struct{ Session domain.Session }
 
 type SessionDeletedMsg struct{}

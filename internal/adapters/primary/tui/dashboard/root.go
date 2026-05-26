@@ -37,6 +37,7 @@ const (
 	popupDeleteSession
 	popupRename
 	popupHelp
+	popupKillPreview
 )
 
 type projectBranchCache struct {
@@ -53,6 +54,7 @@ type Model struct {
 	createForm              sessionui.CreateFormModel
 	deleteForm              sessionui.DeleteFormModel
 	renameForm              sessionui.RenameFormModel
+	killPreviewForm         sessionui.KillPreviewFormModel
 	helpPopup               shared.HelpPopupModel
 	scheduler               jobs.Model
 	activePopup             popupKind
@@ -264,7 +266,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmd, inspectorCmd, m.loadCurrentBranchCmd(msg.Session.ProjectID))
 		}
 		return m, tea.Batch(cmd, inspectorCmd)
-	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg, shared.RenamePopupCloseMsg, shared.HelpPopupCloseMsg:
+	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg, shared.RenamePopupCloseMsg, shared.HelpPopupCloseMsg, shared.KillPreviewPopupCloseMsg:
 		m.activePopup = popupNone
 		return m, nil
 	case shared.SessionAttachReadyMsg:
@@ -277,6 +279,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case shared.SessionAttachedMsg:
 		return m, nil
 	case shared.SessionEditorLaunchedMsg:
+		return m, nil
+	case shared.PreviewSessionKilledMsg:
+		m.activePopup = popupNone
 		return m, nil
 	case shared.JobsTickMsg, shared.JobsBatchMsg:
 		var cmd tea.Cmd
@@ -359,6 +364,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 			return cmd, true
 		}
 	}
+	if key.Matches(msg, killPreviewSessionKeyBinding) {
+		if cmd := m.showKillPreviewPopupCmd(); cmd != nil {
+			return cmd, true
+		}
+	}
 	return nil, false
 }
 
@@ -421,6 +431,25 @@ func (m Model) openSelectedSessionEditorCmd() tea.Cmd {
 	}
 }
 
+func (m *Model) showKillPreviewPopupCmd() tea.Cmd {
+	idStr := m.leftPane.SelectedSessionID()
+	if idStr == "" {
+		return nil
+	}
+	sessID, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil
+	}
+	sess, ok := m.leftPane.SelectedSession()
+	if !ok {
+		return nil
+	}
+	kind := m.inspector.ActiveViewLabel()
+	m.killPreviewForm = sessionui.NewKillPreviewForm(m.styles, m.sessionsService, sessID, sess.Name, kind)
+	m.activePopup = popupKillPreview
+	return m.killPreviewForm.Init()
+}
+
 func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.activePopup {
 	case popupNewSession:
@@ -438,6 +467,10 @@ func (m Model) routeToPopup(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case popupHelp:
 		var cmd tea.Cmd
 		m.helpPopup, cmd = shared.UpdateModel(m.helpPopup, msg)
+		return m, cmd
+	case popupKillPreview:
+		var cmd tea.Cmd
+		m.killPreviewForm, cmd = shared.UpdateModel(m.killPreviewForm, msg)
 		return m, cmd
 	}
 	return m, nil
@@ -504,6 +537,8 @@ func (m Model) popupView() string {
 		return m.renameForm.View().Content
 	case popupHelp:
 		return m.helpPopup.View().Content
+	case popupKillPreview:
+		return m.killPreviewForm.View().Content
 	}
 	return ""
 }
