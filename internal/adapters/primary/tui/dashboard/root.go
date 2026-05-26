@@ -266,9 +266,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmd, inspectorCmd, m.loadCurrentBranchCmd(msg.Session.ProjectID))
 		}
 		return m, tea.Batch(cmd, inspectorCmd)
-	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg, shared.RenamePopupCloseMsg, shared.HelpPopupCloseMsg, shared.KillPreviewPopupCloseMsg:
+	case shared.NewSessionPopupCloseMsg, shared.NewSessionDeletePopupCloseMsg, shared.RenamePopupCloseMsg, shared.HelpPopupCloseMsg:
 		m.activePopup = popupNone
 		return m, nil
+	case shared.KillPreviewPopupCloseMsg:
+		m.activePopup = popupNone
+		return m, m.inspector.Init()
 	case shared.SessionAttachReadyMsg:
 		if msg.Err != nil || msg.Command == nil {
 			return m, nil
@@ -282,7 +285,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case shared.PreviewSessionKilledMsg:
 		m.activePopup = popupNone
-		return m, nil
+		return m, m.inspector.Init()
 	case shared.JobsTickMsg, shared.JobsBatchMsg:
 		var cmd tea.Cmd
 		m.scheduler, cmd = m.scheduler.Update(msg)
