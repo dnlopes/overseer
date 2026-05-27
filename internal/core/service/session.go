@@ -654,6 +654,37 @@ func (s *SessionService) PreviewSession(ctx context.Context, req PreviewSessionR
 	return PreviewSessionResponse{Content: content, SessionReady: true}, nil
 }
 
+// --- KillPreviewSession ---
+
+type KillPreviewSessionRequest struct {
+	ID   uuid.UUID
+	Kind PreviewKind
+}
+
+type KillPreviewSessionResponse struct{}
+
+func (s *SessionService) KillPreviewSession(ctx context.Context, req KillPreviewSessionRequest) (KillPreviewSessionResponse, error) {
+	sess, err := s.repo.Get(ctx, req.ID)
+	if err != nil {
+		return KillPreviewSessionResponse{}, err
+	}
+
+	tmuxID := sess.ID.String()
+	if req.Kind == PreviewKindAgent {
+		tmuxID += "-agent"
+	}
+
+	if err := s.killTmuxIfExists(ctx, tmuxID); err != nil {
+		return KillPreviewSessionResponse{}, fmt.Errorf("kill preview session: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "preview session killed",
+		slog.String("id", sess.ID.String()),
+		slog.String("tmux_id", tmuxID),
+	)
+	return KillPreviewSessionResponse{}, nil
+}
+
 // --- Delete ---
 
 type DeleteSessionRequest struct {
