@@ -13,6 +13,9 @@ import (
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/jobs"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/shared"
 	"github.com/dnlopes/overseer/internal/adapters/primary/tui/styles"
+	"github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/claudecode"
+	"github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/opencode"
+	agentstatusregistry "github.com/dnlopes/overseer/internal/adapters/secondary/agentstatus/registry"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/git"
 	githubcli "github.com/dnlopes/overseer/internal/adapters/secondary/github"
 	"github.com/dnlopes/overseer/internal/adapters/secondary/storage"
@@ -92,8 +95,17 @@ func main() {
 	projectSvc := service.NewProjectService(store.Projects(), gitAdapter, log)
 	prSvc := service.NewPullRequestService(githubAdapter, log)
 
+	agentStatusRegistry := agentstatusregistry.New()
+	agentStatusRegistry.Register(claudecode.NewPaneDetector(tmuxAdapter))
+	agentStatusRegistry.Register(opencode.NewPaneDetector(tmuxAdapter))
+	agentStatusSvc := service.NewAgentStatusService(store.Sessions(), tmuxAdapter, agentStatusRegistry, log)
+
 	prJob := buildPullRequestJob(sessionSvc, projectSvc, prSvc)
-	scheduler := jobs.New(prJob)
+	schedulerJobs := []jobs.Job{prJob}
+	if cfg.AgentStatus.Enabled {
+		schedulerJobs = append(schedulerJobs, buildAgentStatusJob(agentStatusSvc, cfg.AgentStatus.RefreshInterval))
+	}
+	scheduler := jobs.New(schedulerJobs...)
 
 	previewRefresh, err := cfg.PreviewRefreshDuration()
 	if err != nil {
@@ -137,6 +149,23 @@ func buildPullRequestJob(
 						return nil
 					}
 					return shared.JobsBatchMsg{Cmds: fanOutPRFetches(prSvc, data)}
+				},
+			)
+		},
+	}
+}
+
+func buildAgentStatusJob(svc *service.AgentStatusService, interval time.Duration) jobs.Job {
+	return jobs.Job{
+		ID:       "agent-status-refresh",
+		Interval: interval,
+		Run: func() tea.Cmd {
+			return shared.Request(
+				func(ctx context.Context) (service.PollAllAgentStatusesResponse, error) {
+					return svc.PollAll(ctx, service.PollAllAgentStatusesRequest{})
+				},
+				func(resp service.PollAllAgentStatusesResponse, err error) tea.Msg {
+					return shared.AgentStatusesUpdatedMsg{Statuses: resp.Statuses, Err: err}
 				},
 			)
 		},

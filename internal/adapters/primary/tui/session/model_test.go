@@ -1,6 +1,7 @@
 package session
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -467,7 +468,7 @@ func newSessionServiceWithRepo(t *testing.T) (service.SessionService, *mocks.Moc
 	projects := mocks.NewMockProjectRepository(t)
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
-	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode")
+	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode", domain.AgentTypeOpenCode)
 	defaultEditor, _ := domain.NewEditor("VSCode", "code")
 	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, defaultEditor, slog.Default()), repo
 }
@@ -541,4 +542,175 @@ func findRow(t *testing.T, view, marker string) string {
 func rowSuffixIs(row, suffix string) bool {
 	trimmed := strings.TrimRight(row, " │")
 	return strings.HasSuffix(trimmed, suffix)
+}
+
+func TestModel_RendersUnknownStatusGlyphBeforeAgentStatusesArrive(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.NewWithTheme("dark", true), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSessionWithWorktree("alpha", overseerID, "/tmp/wt", "branch")
+
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha}})
+
+	view := ansi.Strip(updated.(Model).View().Content)
+	alphaRow := findRow(t, view, "alpha")
+	if !strings.Contains(alphaRow, "? alpha") {
+		t.Errorf("alpha row missing unknown-status glyph '? ': %q", alphaRow)
+	}
+}
+
+func TestModel_AgentStatusesUpdatedMsg_RendersStatusGlyphPerSession(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.NewWithTheme("dark", true), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	running := testutil.MakeSessionWithWorktree("running-sess", overseerID, "/tmp/wt-a", "branch-a")
+	waiting := testutil.MakeSessionWithWorktree("waiting-sess", overseerID, "/tmp/wt-b", "branch-b")
+	dead := testutil.MakeSessionWithWorktree("dead-sess", overseerID, "/tmp/wt-c", "branch-c")
+	idle := testutil.MakeSessionWithWorktree("idle-sess", overseerID, "/tmp/wt-d", "branch-d")
+	sessions := []domain.Session{running, waiting, dead, idle}
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: sessions})
+	statuses := map[uuid.UUID]domain.AgentStatus{
+		running.ID: {Kind: domain.AgentStatusRunning},
+		waiting.ID: {Kind: domain.AgentStatusWaiting},
+		dead.ID:    {Kind: domain.AgentStatusDead},
+		idle.ID:    {Kind: domain.AgentStatusIdle},
+	}
+
+	updated, _ = updated.(Model).Update(shared.AgentStatusesUpdatedMsg{Statuses: statuses})
+
+	view := ansi.Strip(updated.(Model).View().Content)
+	cases := []struct {
+		marker string
+		glyph  string
+	}{
+		{"running-sess", "● running-sess"},
+		{"waiting-sess", "◐ waiting-sess"},
+		{"dead-sess", "■ dead-sess"},
+		{"idle-sess", "○ idle-sess"},
+	}
+	for _, tc := range cases {
+		row := findRow(t, view, tc.marker)
+		if !strings.Contains(row, tc.glyph) {
+			t.Errorf("%q row missing status glyph %q in: %q", tc.marker, tc.glyph, row)
+		}
+	}
+}
+
+func TestModel_AgentStatusesUpdatedMsg_KeepsLabelBadgeIntact(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.NewWithTheme("dark", true), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSessionWithWorktree("alpha", overseerID, "/tmp/wt", "branch")
+	alpha.Label = "WIP"
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha}})
+	updated, _ = updated.(Model).Update(shared.AgentStatusesUpdatedMsg{
+		Statuses: map[uuid.UUID]domain.AgentStatus{alpha.ID: {Kind: domain.AgentStatusRunning}},
+	})
+
+	view := ansi.Strip(updated.(Model).View().Content)
+	alphaRow := findRow(t, view, "alpha")
+	if !strings.Contains(alphaRow, "● alpha") {
+		t.Errorf("alpha row missing running-status glyph: %q", alphaRow)
+	}
+	if !strings.Contains(alphaRow, "WIP") {
+		t.Errorf("alpha row missing 'WIP' label badge: %q", alphaRow)
+	}
+}
+
+func TestModel_AgentStatusesUpdatedMsg_DropsUnknownGlyphForMissingStatus(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.NewWithTheme("dark", true), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSessionWithWorktree("alpha", overseerID, "/tmp/wt-a", "branch-a")
+	beta := testutil.MakeSessionWithWorktree("beta", overseerID, "/tmp/wt-b", "branch-b")
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
+
+	updated, _ = updated.(Model).Update(shared.AgentStatusesUpdatedMsg{
+		Statuses: map[uuid.UUID]domain.AgentStatus{alpha.ID: {Kind: domain.AgentStatusRunning}},
+	})
+
+	view := ansi.Strip(updated.(Model).View().Content)
+	betaRow := findRow(t, view, "beta")
+	if !strings.Contains(betaRow, "? beta") {
+		t.Errorf("beta row should fall back to unknown '?' when no status given: %q", betaRow)
+	}
+}
+
+func TestModel_AgentStatusesUpdatedMsg_ErrorIsIgnored(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.NewWithTheme("dark", true), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSession("alpha", overseerID)
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha}})
+	updated, _ = updated.(Model).Update(shared.AgentStatusesUpdatedMsg{
+		Statuses: map[uuid.UUID]domain.AgentStatus{alpha.ID: {Kind: domain.AgentStatusRunning}},
+	})
+	beforeView := ansi.Strip(updated.(Model).View().Content)
+
+	updated, _ = updated.(Model).Update(shared.AgentStatusesUpdatedMsg{
+		Statuses: nil,
+		Err:      errAgentStatusPoll,
+	})
+
+	afterView := ansi.Strip(updated.(Model).View().Content)
+	if beforeView != afterView {
+		t.Errorf("errored AgentStatusesUpdatedMsg must not overwrite previous statuses\nbefore:\n%s\nafter:\n%s", beforeView, afterView)
+	}
+}
+
+var errAgentStatusPoll = errPlaceholder("agent status poll failed")
+
+type errPlaceholder string
+
+func (e errPlaceholder) Error() string { return string(e) }
+
+func TestModel_AgentStatusesUpdatedMsg_SelectionWinsOverStatusTint(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.NewWithTheme("dark", true), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	running := testutil.MakeSessionWithWorktree("running-sess", overseerID, "/tmp/wt-a", "branch-a")
+	other := testutil.MakeSessionWithWorktree("other-sess", overseerID, "/tmp/wt-b", "branch-b")
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{running, other}})
+	updated, _ = updated.(Model).Update(shared.AgentStatusesUpdatedMsg{
+		Statuses: map[uuid.UUID]domain.AgentStatus{
+			running.ID: {Kind: domain.AgentStatusRunning},
+			other.ID:   {Kind: domain.AgentStatusRunning},
+		},
+	})
+
+	rawView := updated.(Model).View().Content
+	focusedRow := findRow(t, rawView, "running-sess")
+	unfocusedRow := findRow(t, rawView, "other-sess")
+
+	selBgSeq := bgColorTriplet(styles.DarkTheme().SelectionBg)
+	runBgSeq := bgColorTriplet(styles.DarkTheme().StatusRunningBg)
+
+	if !strings.Contains(focusedRow, selBgSeq) {
+		t.Errorf("focused running-sess row should carry SelectionBg %q in ANSI:\n%q", selBgSeq, focusedRow)
+	}
+	if strings.Contains(focusedRow, runBgSeq) {
+		t.Errorf("focused running-sess row must NOT carry StatusRunningBg %q (selection precedence violated):\n%q", runBgSeq, focusedRow)
+	}
+	if !strings.Contains(unfocusedRow, runBgSeq) {
+		t.Errorf("unfocused other-sess row should carry StatusRunningBg %q in ANSI:\n%q", runBgSeq, unfocusedRow)
+	}
+}
+
+func bgColorTriplet(c interface {
+	RGBA() (uint32, uint32, uint32, uint32)
+}) string {
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("48;2;%d;%d;%d", r>>8, g>>8, b>>8)
 }

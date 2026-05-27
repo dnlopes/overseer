@@ -48,6 +48,78 @@ func TestDefault_ShipsOpencodeAndClaudeLaunchers(t *testing.T) {
 	}
 }
 
+func TestLoad_BuiltinDefaultsHaveAgentType(t *testing.T) {
+	cfg := config.Default()
+
+	if len(cfg.Launchers) != 2 {
+		t.Fatalf("Launchers: want 2 entries, got %d", len(cfg.Launchers))
+	}
+	if cfg.Launchers[0].AgentType != "opencode" {
+		t.Errorf("Launchers[0].AgentType = %q, want %q", cfg.Launchers[0].AgentType, "opencode")
+	}
+	if cfg.Launchers[1].AgentType != "claude-code" {
+		t.Errorf("Launchers[1].AgentType = %q, want %q", cfg.Launchers[1].AgentType, "claude-code")
+	}
+}
+
+func TestLoad_CustomLauncherWithoutAgentType_Fails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := `launchers:
+  - displayName: My Custom Agent
+    command: my-agent
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.Load(path)
+	if err == nil {
+		t.Fatal("expected error for custom launcher without agentType, got nil")
+	}
+	if !errs.Is(err, errs.ErrInvalidInput) {
+		t.Errorf("expected ErrInvalidInput in error chain, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "My Custom Agent") {
+		t.Errorf("expected error to include launcher display name %q, got: %v", "My Custom Agent", err)
+	}
+	if !strings.Contains(err.Error(), "agentType") {
+		t.Errorf("expected error to mention %q, got: %v", "agentType", err)
+	}
+}
+
+func TestLoad_DefaultsApplyWhenAgentStatusSectionMissing(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	content := "logging:\n  level: debug\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !cfg.AgentStatus.Enabled {
+		t.Errorf("AgentStatus.Enabled: want true, got false")
+	}
+	if cfg.AgentStatus.RefreshInterval != 5*time.Second {
+		t.Errorf("AgentStatus.RefreshInterval: want 5s, got %v", cfg.AgentStatus.RefreshInterval)
+	}
+	if !cfg.AgentStatus.Display.SessionList {
+		t.Errorf("AgentStatus.Display.SessionList: want true, got false")
+	}
+	if !cfg.AgentStatus.Display.StatusBar {
+		t.Errorf("AgentStatus.Display.StatusBar: want true, got false")
+	}
+	if cfg.AgentStatus.Display.RowHighlight != "subtle" {
+		t.Errorf("AgentStatus.Display.RowHighlight: want %q, got %q", "subtle", cfg.AgentStatus.Display.RowHighlight)
+	}
+}
+
 func TestDefault_ShipsVSCodeEditor(t *testing.T) {
 	cfg := config.Default()
 
@@ -222,8 +294,10 @@ storage:
 launchers:
   - displayName: Custom Agent
     command: my-agent --foo
+    agentType: claude-code
   - displayName: Plain Bash
     command: bash
+    agentType: opencode
 editors:
   - displayName: Cursor
     command: cursor
@@ -436,8 +510,8 @@ func TestValidate_InvalidMinHeight_ReturnsError(t *testing.T) {
 func TestDomainLaunchers_ConvertsValidEntries(t *testing.T) {
 	cfg := config.Config{
 		Launchers: []config.LauncherConfig{
-			{DisplayName: "OpenCode", Command: "opencode"},
-			{DisplayName: "Claude", Command: "claude --debug"},
+			{DisplayName: "OpenCode", Command: "opencode", AgentType: "opencode"},
+			{DisplayName: "Claude", Command: "claude --debug", AgentType: "claude-code"},
 		},
 	}
 

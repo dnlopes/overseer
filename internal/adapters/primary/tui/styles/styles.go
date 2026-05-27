@@ -143,6 +143,13 @@ type Styles struct {
 	// relative timestamp) appended to a row; like Number/NumberSelected
 	// they share the selection background of their matching label state
 	// so a selected row reads as a single highlight strip.
+	//
+	// StatusRunning / StatusWaiting / StatusDead paint the row body with
+	// a subtle tinted background derived from the per-status theme palette.
+	// Idle and Unknown rows render with Normal — they carry no tint. These
+	// variants apply ONLY when the row is not focused; selection always
+	// wins over status tint so the user can still see what they have
+	// highlighted (see renderSessionNode in session/model.go).
 	ListRow struct {
 		Normal         lipgloss.Style
 		Selected       lipgloss.Style
@@ -150,6 +157,9 @@ type Styles struct {
 		NumberSelected lipgloss.Style
 		Aux            lipgloss.Style
 		AuxSelected    lipgloss.Style
+		StatusRunning  lipgloss.Style
+		StatusWaiting  lipgloss.Style
+		StatusDead     lipgloss.Style
 	}
 	Group         GroupStyles
 	Status        StatusStyles
@@ -157,7 +167,7 @@ type Styles struct {
 		Default   lipgloss.Style
 		Highlight lipgloss.Style
 	}
-	Form   FormStyles
+	Form FormStyles
 	Danger struct {
 		Title lipgloss.Style
 		Body  lipgloss.Style
@@ -234,6 +244,9 @@ func NewWithTheme(themeName string, disableEmoji bool) *Styles {
 			NumberSelected lipgloss.Style
 			Aux            lipgloss.Style
 			AuxSelected    lipgloss.Style
+			StatusRunning  lipgloss.Style
+			StatusWaiting  lipgloss.Style
+			StatusDead     lipgloss.Style
 		}{
 			Normal:         lipgloss.NewStyle().Foreground(theme.Text),
 			Selected:       lipgloss.NewStyle().Foreground(theme.Text).Bold(true).Background(theme.SelectionBg),
@@ -241,6 +254,9 @@ func NewWithTheme(themeName string, disableEmoji bool) *Styles {
 			NumberSelected: lipgloss.NewStyle().Foreground(theme.Subtext).Bold(true).Background(theme.SelectionBg),
 			Aux:            lipgloss.NewStyle().Foreground(theme.Muted),
 			AuxSelected:    lipgloss.NewStyle().Foreground(theme.Subtext).Background(theme.SelectionBg),
+			StatusRunning:  lipgloss.NewStyle().Foreground(theme.Text).Background(theme.StatusRunningBg),
+			StatusWaiting:  lipgloss.NewStyle().Foreground(theme.Text).Background(theme.StatusWaitingBg),
+			StatusDead:     lipgloss.NewStyle().Foreground(theme.Text).Background(theme.StatusDeadBg),
 		},
 		Group: GroupStyles{
 			Header:         lipgloss.NewStyle().Foreground(theme.Accent).Bold(true),

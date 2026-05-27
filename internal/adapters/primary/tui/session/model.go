@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,37 +36,40 @@ const (
 )
 
 type sessionNode struct {
-	kind       sessionNodeKind
-	sessionID  string
-	projectID  uuid.UUID
-	label      string
-	statusCode string
-	updatedAt  time.Time
+	kind        sessionNodeKind
+	sessionID   string
+	projectID   uuid.UUID
+	label       string
+	statusCode  string
+	updatedAt   time.Time
+	agentStatus domain.AgentStatusKind
 }
 
 type Model struct {
-	sessions     []domain.Session
-	projectNames map[uuid.UUID]string
-	labels       []domain.Label
-	groupingMode sessionGroupingMode
-	styles       *styles.Styles
-	service      service.SessionService
-	tree         components.TreeModel[sessionNode]
-	focused      bool
-	width        int
-	height       int
-	err          error
+	sessions       []domain.Session
+	projectNames   map[uuid.UUID]string
+	labels         []domain.Label
+	groupingMode   sessionGroupingMode
+	styles         *styles.Styles
+	service        service.SessionService
+	tree           components.TreeModel[sessionNode]
+	focused        bool
+	width          int
+	height         int
+	err            error
+	agentStatuses  map[uuid.UUID]domain.AgentStatus
 }
 
 func New(s *styles.Styles, service service.SessionService, labels []domain.Label) Model {
 	tree := components.NewTree(renderSessionNode(s, labels))
 	return Model{
-		styles:       s,
-		service:      service,
-		labels:       labels,
-		tree:         tree,
-		groupingMode: sessionGroupingProject,
-		projectNames: map[uuid.UUID]string{},
+		styles:        s,
+		service:       service,
+		labels:        labels,
+		tree:          tree,
+		groupingMode:  sessionGroupingProject,
+		projectNames:  map[uuid.UUID]string{},
+		agentStatuses: map[uuid.UUID]domain.AgentStatus{},
 	}
 }
 
@@ -129,6 +133,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.loadSessions()
 	case shared.SessionRenamedMsg:
 		return m, m.loadSessions()
+	case shared.AgentStatusesUpdatedMsg:
+		if msg.Err != nil {
+			return m, nil
+		}
+		m.agentStatuses = msg.Statuses
+		m.rebuildTree()
+		return m, nil
 	case components.TreeSelectMsg[sessionNode]:
 		if msg.Item.kind == sessionNodeSession {
 			if sess, ok := m.findSession(msg.Item.sessionID); ok {
@@ -361,7 +372,52 @@ func (m Model) View() tea.View {
 			m.styles.EmptyState.Hint.Render("Press n to create one"),
 		}, "\n"), innerW, innerH)
 	}
-	return components.PanelWithTitle(m.styles, content, "Sessions", m.focused, m.width, m.height)
+	return components.PanelWithTitle(m.styles, content, agentStatusTitle(m.agentStatuses, m.styles.Glyphs), m.focused, m.width, m.height)
+}
+
+var agentStatusTitleOrder = []domain.AgentStatusKind{
+	domain.AgentStatusRunning,
+	domain.AgentStatusWaiting,
+	domain.AgentStatusDead,
+	domain.AgentStatusIdle,
+	domain.AgentStatusUnknown,
+}
+
+func agentStatusLabel(kind domain.AgentStatusKind) string {
+	switch kind {
+	case domain.AgentStatusRunning:
+		return "running"
+	case domain.AgentStatusWaiting:
+		return "waiting"
+	case domain.AgentStatusIdle:
+		return "idle"
+	case domain.AgentStatusDead:
+		return "dead"
+	default:
+		return "unknown"
+	}
+}
+
+func agentStatusTitle(statuses map[uuid.UUID]domain.AgentStatus, glyphs styles.Glyphs) string {
+	if len(statuses) == 0 {
+		return "Sessions"
+	}
+	counts := map[domain.AgentStatusKind]int{}
+	for _, st := range statuses {
+		counts[st.Kind]++
+	}
+	segments := make([]string, 0, len(agentStatusTitleOrder))
+	for _, kind := range agentStatusTitleOrder {
+		n := counts[kind]
+		if n == 0 {
+			continue
+		}
+		segments = append(segments, glyphs.AgentStatus(kind)+" "+strconv.Itoa(n)+" "+agentStatusLabel(kind))
+	}
+	if len(segments) == 0 {
+		return "Sessions"
+	}
+	return "Sessions (" + strings.Join(segments, " ") + ")"
 }
 
 func (m Model) loadSessions() tea.Cmd {
@@ -373,20 +429,20 @@ func (m Model) loadSessions() tea.Cmd {
 
 func (m Model) sessionTreeNodes() []components.TreeNode[sessionNode] {
 	if m.groupingMode == sessionGroupingNone {
-		return rawSessionNodes(m.sessions, m.styles.Glyphs)
+		return rawSessionNodes(m.sessions, m.styles.Glyphs, m.agentStatuses)
 	}
-	return projectSessionNodes(m.sessions, m.projectNames, m.styles.Glyphs)
+	return projectSessionNodes(m.sessions, m.projectNames, m.styles.Glyphs, m.agentStatuses)
 }
 
-func rawSessionNodes(sessions []domain.Session, glyphs styles.Glyphs) []components.TreeNode[sessionNode] {
+func rawSessionNodes(sessions []domain.Session, glyphs styles.Glyphs, statuses map[uuid.UUID]domain.AgentStatus) []components.TreeNode[sessionNode] {
 	nodes := make([]components.TreeNode[sessionNode], len(sessions))
 	for i, sess := range sessions {
-		nodes[i] = sessionTreeNode(sess, glyphs)
+		nodes[i] = sessionTreeNode(sess, glyphs, statusKindFor(sess.ID, statuses))
 	}
 	return nodes
 }
 
-func projectSessionNodes(sessions []domain.Session, projectNames map[uuid.UUID]string, glyphs styles.Glyphs) []components.TreeNode[sessionNode] {
+func projectSessionNodes(sessions []domain.Session, projectNames map[uuid.UUID]string, glyphs styles.Glyphs, statuses map[uuid.UUID]domain.AgentStatus) []components.TreeNode[sessionNode] {
 	grouped := make(map[uuid.UUID][]domain.Session)
 	ids := make([]uuid.UUID, 0)
 	for _, sess := range sessions {
@@ -404,7 +460,7 @@ func projectSessionNodes(sessions []domain.Session, projectNames map[uuid.UUID]s
 		groupSessions := grouped[id]
 		children := make([]components.TreeNode[sessionNode], len(groupSessions))
 		for j, sess := range groupSessions {
-			children[j] = sessionTreeNode(sess, glyphs)
+			children[j] = sessionTreeNode(sess, glyphs, statusKindFor(sess.ID, statuses))
 		}
 		label := projectLabel(id, projectNames)
 		nodes[i] = components.TreeNode[sessionNode]{
@@ -414,6 +470,13 @@ func projectSessionNodes(sessions []domain.Session, projectNames map[uuid.UUID]s
 		}
 	}
 	return nodes
+}
+
+func statusKindFor(id uuid.UUID, statuses map[uuid.UUID]domain.AgentStatus) domain.AgentStatusKind {
+	if st, ok := statuses[id]; ok {
+		return st.Kind
+	}
+	return domain.AgentStatusUnknown
 }
 
 func projectLabel(id uuid.UUID, names map[uuid.UUID]string) string {
@@ -426,7 +489,7 @@ func projectLabel(id uuid.UUID, names map[uuid.UUID]string) string {
 	return id.String()
 }
 
-func sessionTreeNode(sess domain.Session, glyphs styles.Glyphs) components.TreeNode[sessionNode] {
+func sessionTreeNode(sess domain.Session, glyphs styles.Glyphs, agentStatus domain.AgentStatusKind) components.TreeNode[sessionNode] {
 	label := sess.Name
 	if !sess.HasWorktree() {
 		label = glyphs.ProjectMode + " " + sess.Name
@@ -434,11 +497,12 @@ func sessionTreeNode(sess domain.Session, glyphs styles.Glyphs) components.TreeN
 	return components.TreeNode[sessionNode]{
 		ID: "session:" + sess.ID.String(),
 		Item: sessionNode{
-			kind:       sessionNodeSession,
-			sessionID:  sess.ID.String(),
-			label:      label,
-			statusCode: sess.Label,
-			updatedAt:  sess.UpdatedAt,
+			kind:        sessionNodeSession,
+			sessionID:   sess.ID.String(),
+			label:       label,
+			statusCode:  sess.Label,
+			updatedAt:   sess.UpdatedAt,
+			agentStatus: agentStatus,
 		},
 	}
 }
@@ -456,7 +520,8 @@ func renderSessionNode(s *styles.Styles, labels []domain.Label) components.TreeR
 			return style.Render(prefix + item.label)
 		}
 
-		body := prefix + item.label
+		statusGlyph := s.Glyphs.AgentStatus(item.agentStatus)
+		body := prefix + statusGlyph + " " + item.label
 		badge := renderLabelBadge(s, item.statusCode, labels)
 		aux := shared.FormatRelativeDuration(time.Since(item.updatedAt))
 
@@ -479,7 +544,7 @@ func renderSessionNode(s *styles.Styles, labels []domain.Label) components.TreeR
 			if focused {
 				return s.ListRow.Selected.Render(body)
 			}
-			return s.ListRow.Normal.Render(body)
+			return statusRowStyle(s, item.agentStatus).Render(body)
 		}
 
 		fillerSpaces := strings.Repeat(" ", filler)
@@ -491,7 +556,21 @@ func renderSessionNode(s *styles.Styles, labels []domain.Label) components.TreeR
 			right := s.ListRow.AuxSelected.Render(auxGapSpaces + aux)
 			return left + right
 		}
-		return s.ListRow.Normal.Render(body) + fillerSpaces + badgeGapSpaces + badge + auxGapSpaces + s.ListRow.Aux.Render(aux)
+		rowStyle := statusRowStyle(s, item.agentStatus)
+		return rowStyle.Render(body) + fillerSpaces + badgeGapSpaces + badge + auxGapSpaces + s.ListRow.Aux.Render(aux)
+	}
+}
+
+func statusRowStyle(s *styles.Styles, kind domain.AgentStatusKind) lipgloss.Style {
+	switch kind {
+	case domain.AgentStatusRunning:
+		return s.ListRow.StatusRunning
+	case domain.AgentStatusWaiting:
+		return s.ListRow.StatusWaiting
+	case domain.AgentStatusDead:
+		return s.ListRow.StatusDead
+	default:
+		return s.ListRow.Normal
 	}
 }
 

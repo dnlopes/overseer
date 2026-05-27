@@ -1,0 +1,40 @@
+
+[91m╭───[39m [91mClaude Code[39m [37mv2.1.142[39m [91m───────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│[39m                                                    [2m[91m│[0m [1m[91mTips for getting started[0m                                                  [91m│
+│[39m                 [1mWelcome back David![0m                [2m[91m│[0m Ask Claude to create a new app or clone a repository                      [91m│
+│[39m                                                    [2m[91m│[0m [91m─────────────────────────────────────────────────────────────────────────[39m [91m│
+│[39m                      [91m ▐[40m▛███▜[49m▌[39m                      [2m[91m│[0m [1m[91mWhat's new[0m                                                                [91m│
+│[39m                      [91m▝▜[40m█████[49m▛▘[39m                     [2m[91m│[0m Internal infrastructure improvements (no user-facing changes)             [91m│
+│[39m                      [91m  ▘▘ ▝▝  [39m                     [2m[91m│[0m `/usage` now shows a per-category breakdown of what's driving your limit… [91m│
+│[39m [37mOpus 4.7 (1M context) with xh… · API Usage Billing[39m [2m[91m│[0m `/diff` detail view can now be scrolled with the keyboard (arrows, `j`/`… [91m│
+│[39m [37m · Outsystems[39m                                      [2m[91m│[0m [3m[37m/release-notes for more[0m                                                   [91m│
+│[39m          [37m/private/tmp/claude-fixture-work[39m          [2m[91m│[0m                                                                           [91m│
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+[37m[100m❯ [97m/model[39m [49m
+[37m  ⎿  [39mKept model as [1mOpus 4.7 (1M context)[0m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[94m▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+[39m   [1m[94mAgents[0m [1m[30m[104m Running [0m  Library
+
+   [37mNo subagents are currently running.[39m
+
+   [37m←/→ to switch · ↑/↓ to navigate · Enter to select · Esc to close[39m

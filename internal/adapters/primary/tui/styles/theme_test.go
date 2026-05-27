@@ -91,9 +91,17 @@ func assertAllColorsSet(t *testing.T, theme styles.Theme) {
 		{"HelpKeyBg", theme.HelpKeyBg},
 		{"ModalBg", theme.ModalBg},
 		{"OverlayBg", theme.OverlayBg},
+		{"StatusRunningFg", theme.StatusRunningFg},
+		{"StatusRunningBg", theme.StatusRunningBg},
+		{"StatusWaitingFg", theme.StatusWaitingFg},
+		{"StatusWaitingBg", theme.StatusWaitingBg},
+		{"StatusIdleFg", theme.StatusIdleFg},
+		{"StatusDeadFg", theme.StatusDeadFg},
+		{"StatusDeadBg", theme.StatusDeadBg},
+		{"StatusUnknownFg", theme.StatusUnknownFg},
 	}
-	if len(fields) != 17 {
-		t.Fatalf("expected 17 color fields, got %d", len(fields))
+	if len(fields) != 25 {
+		t.Fatalf("expected 25 color fields, got %d", len(fields))
 	}
 	for _, f := range fields {
 		if f.color == nil {

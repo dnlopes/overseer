@@ -1,11 +1,14 @@
 package storage_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -288,6 +291,60 @@ func TestSessionStore_AgentCommandSurvivesReload(t *testing.T) {
 	}
 	if got.AgentCommand != "opencode --config /tmp/cfg.json" {
 		t.Errorf("Get() AgentCommand = %q, want %q", got.AgentCommand, "opencode --config /tmp/cfg.json")
+	}
+}
+
+func TestStore_MigratesSessionsWithoutAgentType(t *testing.T) {
+	fixturePath, err := filepath.Abs("testdata/store_v0_no_agent_type.json")
+	if err != nil {
+		t.Fatalf("resolve fixture path: %v", err)
+	}
+	fixture, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	dataPath := filepath.Join(t.TempDir(), "data.json")
+	if err := os.WriteFile(dataPath, fixture, 0o600); err != nil {
+		t.Fatalf("seed fixture: %v", err)
+	}
+
+	var logBuf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	store, err := storage.New(dataPath, logger)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	sessions, err := store.Sessions().List(context.Background())
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	want := map[string]domain.AgentType{
+		"claude-prefix-session":    domain.AgentTypeClaudeCode,
+		"claude-args-session":      domain.AgentTypeClaudeCode,
+		"opencode-session":         domain.AgentTypeOpenCode,
+		"unknown-command-session":  domain.AgentTypeUnknown,
+		"no-agent-command-session": domain.AgentTypeUnknown,
+	}
+	if len(sessions) != len(want) {
+		t.Fatalf("List() len = %d, want %d", len(sessions), len(want))
+	}
+	for _, sess := range sessions {
+		expected, ok := want[sess.Name]
+		if !ok {
+			t.Errorf("unexpected session in store: %q", sess.Name)
+			continue
+		}
+		if sess.AgentType != expected {
+			t.Errorf("session %q AgentType = %q, want %q", sess.Name, sess.AgentType, expected)
+		}
+	}
+
+	if !strings.Contains(logBuf.String(), "agent type inferred") {
+		t.Errorf("expected INFO log mentioning agent type inference, got log output:\n%s", logBuf.String())
 	}
 }
 

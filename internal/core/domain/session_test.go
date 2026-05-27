@@ -426,3 +426,32 @@ func TestAssignLabel_DoesNotBumpTimestampOnError(t *testing.T) {
 		t.Fatalf("UpdatedAt = %v, want unchanged %v after rejected assignment", s.UpdatedAt, originalUpdated)
 	}
 }
+
+func TestSession_AssignAgentType_Validates(t *testing.T) {
+	t.Run("rejects empty agent type", func(t *testing.T) {
+		s, _ := NewSession("alpha", uuid.New())
+		err := s.AssignAgentType("")
+		if !errors.Is(err, ErrAgentTypeRequired) {
+			t.Fatalf("AssignAgentType(\"\") error = %v, want %v", err, ErrAgentTypeRequired)
+		}
+		if s.AgentType != "" {
+			t.Fatalf("AgentType = %q, want empty after rejected assignment", s.AgentType)
+		}
+	})
+
+	t.Run("valid type stores and bumps UpdatedAt", func(t *testing.T) {
+		s, _ := NewSession("alpha", uuid.New())
+		originalUpdated := s.UpdatedAt
+		time.Sleep(time.Millisecond)
+
+		if err := s.AssignAgentType(AgentTypeClaudeCode); err != nil {
+			t.Fatalf("AssignAgentType() error = %v", err)
+		}
+		if s.AgentType != AgentTypeClaudeCode {
+			t.Fatalf("AgentType = %q, want %q", s.AgentType, AgentTypeClaudeCode)
+		}
+		if !s.UpdatedAt.After(originalUpdated) {
+			t.Fatalf("UpdatedAt = %v, want after %v", s.UpdatedAt, originalUpdated)
+		}
+	})
+}

@@ -92,6 +92,11 @@ type PRStatusUpdatedMsg struct {
 	Err       error
 }
 
+type AgentStatusesUpdatedMsg struct {
+	Statuses map[uuid.UUID]domain.AgentStatus
+	Err      error
+}
+
 type BranchesLoadedMsg struct {
 	ProjectID     uuid.UUID
 	Branches      []domain.BranchInfo
