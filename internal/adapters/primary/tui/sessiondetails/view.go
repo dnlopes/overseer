@@ -83,8 +83,8 @@ func (m Model) renderRepositorySection(width int) []string {
 	valueW := twoColumnValueWidth(width)
 	rows := []string{}
 
-	if repo := repoSlugFromPR(m.prCache[m.session.ID].PR.URL); repo != "" {
-		rows = append(rows, twoColumnRow(s, labelRepository, glyphLine(s, g.Repo, repo, valueW)))
+	if name := m.projectNames[m.session.ProjectID]; name != "" {
+		rows = append(rows, twoColumnRow(s, labelRepository, glyphLine(s, g.Repo, name, valueW)))
 	}
 
 	branch, suffix := m.branchValue()
@@ -198,25 +198,6 @@ func formatPRState(state domain.PRState) string {
 		return ""
 	}
 	return strings.ToUpper(str[:1]) + strings.ToLower(str[1:])
-}
-
-// repoSlugFromPR extracts the "owner/repo" slug from a GitHub-style PR URL
-// like "https://github.com/owner/repo/pull/123". Returns "" if the URL is
-// empty or does not contain "/pull/" — the local domain has no other
-// source for the remote URL, so callers omit the line in that case.
-func repoSlugFromPR(prURL string) string {
-	if prURL == "" {
-		return ""
-	}
-	idx := strings.Index(prURL, "/pull/")
-	if idx <= 0 {
-		return ""
-	}
-	parts := strings.Split(prURL[:idx], "/")
-	if len(parts) < 2 {
-		return ""
-	}
-	return parts[len(parts)-2] + "/" + parts[len(parts)-1]
 }
 
 func glyphLine(s *styles.SessionDetailsStyles, glyph, value string, width int) string {

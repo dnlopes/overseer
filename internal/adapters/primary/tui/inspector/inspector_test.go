@@ -74,6 +74,23 @@ func TestInspector_SessionSelectedMsg_PropagatesToAllViews(t *testing.T) {
 	}
 }
 
+func TestInspector_SessionSelectedMsg_ResetsToAgentView(t *testing.T) {
+	m := newTestModel(t)
+	updated, _ := m.Update(keyPress("tab"))
+	m = updated.(Model)
+	if got := m.views[m.activeIx].Label(); got != "Shell" {
+		t.Fatalf("precondition failed: active view label = %q, want %q", got, "Shell")
+	}
+
+	id := uuid.New()
+	updated, _ = m.Update(shared.SessionSelectedMsg{Session: domain.Session{ID: id}})
+	m = updated.(Model)
+
+	if got := m.views[m.activeIx].Label(); got != "Agent" {
+		t.Errorf("after SessionSelectedMsg, active view label = %q, want %q", got, "Agent")
+	}
+}
+
 func TestInspector_PreviewCapturedMsg_OnlyActiveViewProcesses(t *testing.T) {
 	m := newTestModel(t)
 	id := uuid.New()
