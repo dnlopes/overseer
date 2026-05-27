@@ -90,6 +90,9 @@ func matchWaiting(lines []string) (domain.AgentStatusKind, string) {
 		if strings.Contains(l, signalWaitingProceed) {
 			return domain.AgentStatusWaiting, "matched " + quote(signalWaitingProceed)
 		}
+		if strings.Contains(l, signalWaitingEnterToSelect) {
+			return domain.AgentStatusWaiting, "matched " + quote(signalWaitingEnterToSelect)
+		}
 	}
 	hasEscCancel := false
 	hasConfirm := false

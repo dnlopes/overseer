@@ -14,8 +14,9 @@ package claudecode
 const (
 	signalRunningInterrupt = "esc to interrupt"
 
-	signalWaitingProceed    = "Do you want to proceed?"
-	signalWaitingConfirm    = "Enter to confirm"
-	signalWaitingEscCancel  = "Esc to cancel"
-	signalWaitingTabToAmend = "Tab to amend"
+	signalWaitingProceed       = "Do you want to proceed?"
+	signalWaitingConfirm       = "Enter to confirm"
+	signalWaitingEscCancel     = "Esc to cancel"
+	signalWaitingTabToAmend    = "Tab to amend"
+	signalWaitingEnterToSelect = "Enter to select"
 )

@@ -46,6 +46,7 @@ func TestPaneDetector_Detect_WaitingFixtures(t *testing.T) {
 	cases := []string{
 		"waiting_bash_approval.txt",
 		"waiting_trust_folder.txt",
+		"waiting_agents_menu.txt",
 	}
 	for _, name := range cases {
 		t.Run(name, func(t *testing.T) {
