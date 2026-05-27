@@ -489,18 +489,18 @@ func (m Model) View() tea.View {
 	titlebarView := m.titlebar.View().Content
 	titlebarHeight := max(lipgloss.Height(titlebarView), 1)
 	statusView := m.status.View().Content
-	statusHeight := max(lipgloss.Height(statusView), 1)
 	helpView := m.helpBar.View().Content
 	helpHeight := max(lipgloss.Height(helpView), 1)
 
-	bodyHeight := max(m.height-titlebarHeight-TitleBarGap-statusHeight-helpHeight, 1)
+	bodyHeight := max(m.height-titlebarHeight-TitleBarGap-helpHeight, 1)
 	leftWidth := m.width * SessionsListWidthPercent / 100
 	rightWidth := m.width - leftWidth
 
-	left := fit(m.styles, m.leftPane.View().Content, leftWidth, bodyHeight)
+	leftColumn := lipgloss.JoinVertical(lipgloss.Left, statusView, m.leftPane.View().Content)
+	left := fit(m.styles, leftColumn, leftWidth, bodyHeight)
 	right := fit(m.styles, m.inspector.View().Content, rightWidth, bodyHeight)
 	body := fit(m.styles, lipgloss.JoinHorizontal(lipgloss.Top, left, right), m.width, bodyHeight)
-	full := lipgloss.JoinVertical(lipgloss.Left, titlebarView, "", body, statusView, helpView)
+	full := lipgloss.JoinVertical(lipgloss.Left, titlebarView, "", body, helpView)
 
 	return tea.NewView(full)
 }
@@ -526,11 +526,12 @@ func (m Model) resize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 
 	leftWidth := m.width * SessionsListWidthPercent / 100
 	rightWidth := m.width - leftWidth
-	bodyHeight := max(m.height-TitleBarHeight-TitleBarGap-StatusBarHeight-HelpBarHeight, 1)
+	bodyHeight := max(m.height-TitleBarHeight-TitleBarGap-HelpBarHeight, 1)
+	leftPaneHeight := max(bodyHeight-StatusBarHeight, 1)
 
-	m.leftPane.SetSize(leftWidth, bodyHeight)
+	m.leftPane.SetSize(leftWidth, leftPaneHeight)
 	m.inspector.SetSize(rightWidth, bodyHeight)
-	m.status.SetSize(m.width, StatusBarHeight)
+	m.status.SetSize(leftWidth, StatusBarHeight)
 	m.helpBar.SetSize(m.width, HelpBarHeight)
 	m.titlebar.SetSize(m.width, TitleBarHeight)
 	return m, nil

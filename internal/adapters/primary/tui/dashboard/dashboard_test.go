@@ -116,6 +116,50 @@ func TestDashboard_AgentStatusesUpdatedMsg_RendersAggregateInStatusBar(t *testin
 	}
 }
 
+func TestDashboard_AgentStatusesUpdatedMsg_RendersAggregateAboveSessionsList(t *testing.T) {
+	m := newTestDashboardNoEmoji(t)
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = updated.(Model)
+
+	statuses := map[uuid.UUID]domain.AgentStatus{
+		uuid.New(): {Kind: domain.AgentStatusRunning},
+	}
+	updated, _ = m.Update(shared.AgentStatusesUpdatedMsg{Statuses: statuses})
+	m = updated.(Model)
+
+	view := ansi.Strip(m.View().Content)
+	lines := strings.Split(view, "\n")
+
+	aggregateLine := -1
+	sessionsBoxLine := -1
+	helpBarLine := -1
+	for i, line := range lines {
+		if aggregateLine == -1 && strings.Contains(line, "● 1") {
+			aggregateLine = i
+		}
+		if sessionsBoxLine == -1 && strings.Contains(line, "─ Sessions ") {
+			sessionsBoxLine = i
+		}
+		if strings.Contains(line, "new session") {
+			helpBarLine = i
+		}
+	}
+
+	if aggregateLine == -1 {
+		t.Fatalf("aggregate '● 1' not found in view:\n%s", view)
+	}
+	if sessionsBoxLine == -1 {
+		t.Fatalf("Sessions box border '─ Sessions ' not found in view:\n%s", view)
+	}
+	if aggregateLine >= sessionsBoxLine {
+		t.Errorf("aggregate should render ABOVE the Sessions box; got aggregate at line %d and Sessions box at line %d", aggregateLine, sessionsBoxLine)
+	}
+	if helpBarLine != -1 && aggregateLine >= helpBarLine {
+		t.Errorf("aggregate should NOT be at the bottom; got aggregate at line %d and help bar at line %d", aggregateLine, helpBarLine)
+	}
+}
+
 func TestDashboard_AgentStatusesUpdatedMsg_OmitsZeroCounts(t *testing.T) {
 	m := newTestDashboardNoEmoji(t)
 
