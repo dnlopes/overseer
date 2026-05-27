@@ -703,8 +703,8 @@ func TestModel_AgentStatusesUpdatedMsg_SelectionWinsOverStatusTint(t *testing.T)
 	if strings.Contains(focusedRow, runBgSeq) {
 		t.Errorf("focused running-sess row must NOT carry StatusRunningBg %q (selection precedence violated):\n%q", runBgSeq, focusedRow)
 	}
-	if !strings.Contains(unfocusedRow, runBgSeq) {
-		t.Errorf("unfocused other-sess row should carry StatusRunningBg %q in ANSI:\n%q", runBgSeq, unfocusedRow)
+	if strings.Contains(unfocusedRow, runBgSeq) {
+		t.Errorf("unfocused other-sess row must NOT carry StatusRunningBg %q (status tint removed):\n%q", runBgSeq, unfocusedRow)
 	}
 }
 
