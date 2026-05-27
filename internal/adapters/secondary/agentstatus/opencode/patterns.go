@@ -24,4 +24,6 @@ const (
 	signalWaitingPermissionRequired = "Permission required"
 	signalWaitingAllowOnce          = "Allow once"
 	signalWaitingReject             = "Reject"
+	signalWaitingEnterSubmit        = "enter submit"
+	signalWaitingEscDismiss         = "esc dismiss"
 )

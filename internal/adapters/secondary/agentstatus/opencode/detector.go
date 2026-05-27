@@ -93,6 +93,8 @@ func matchWaiting(lines []string) (domain.AgentStatusKind, string) {
 	}
 	hasAllowOnce := false
 	hasReject := false
+	hasEnterSubmit := false
+	hasEscDismiss := false
 	for _, l := range lines {
 		if strings.Contains(l, signalWaitingAllowOnce) {
 			hasAllowOnce = true
@@ -100,9 +102,18 @@ func matchWaiting(lines []string) (domain.AgentStatusKind, string) {
 		if strings.Contains(l, signalWaitingReject) {
 			hasReject = true
 		}
+		if strings.Contains(l, signalWaitingEnterSubmit) {
+			hasEnterSubmit = true
+		}
+		if strings.Contains(l, signalWaitingEscDismiss) {
+			hasEscDismiss = true
+		}
 	}
-	if hasAllowOnce && hasReject {
+	switch {
+	case hasAllowOnce && hasReject:
 		return domain.AgentStatusWaiting, "matched " + quote(signalWaitingAllowOnce) + " + " + quote(signalWaitingReject)
+	case hasEnterSubmit && hasEscDismiss:
+		return domain.AgentStatusWaiting, "matched " + quote(signalWaitingEnterSubmit) + " + " + quote(signalWaitingEscDismiss)
 	}
 	return "", ""
 }
