@@ -81,11 +81,11 @@ func NewGlyphs(disableEmoji bool) Glyphs {
 		LabelTesting:  "🧪",
 		LabelReady:    "🚀",
 		LabelDone:     "✅",
-		StatusRunning: "🟢",
-		StatusWaiting: "🟡",
-		StatusIdle:    "⚪",
-		StatusDead:    "🔴",
-		StatusUnknown: "❔",
+		StatusRunning: "🏃",
+		StatusWaiting: "🙋",
+		StatusIdle:    "💤",
+		StatusDead:    "💀",
+		StatusUnknown: "❓",
 	}
 }
 
