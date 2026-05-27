@@ -32,3 +32,5 @@ packages:
       TmuxAdapter:
       GitAdapter:
       PullRequestPort:
+      AgentStatusDetector:
+      AgentStatusDetectorRegistry:

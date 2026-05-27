@@ -54,6 +54,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.sessionDetails, cmd = shared.UpdateModel(m.sessionDetails, typed)
 		return m, cmd
+	case shared.AgentStatusesUpdatedMsg:
+		var cmd tea.Cmd
+		m.sessions, cmd = shared.UpdateModel(m.sessions, typed)
+		return m, cmd
 	}
 
 	var cmd tea.Cmd

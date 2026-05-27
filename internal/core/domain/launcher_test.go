@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewLauncher_CreatesLauncherWithProvidedFields(t *testing.T) {
-	l, err := NewLauncher("OpenCode", "opencode")
+	l, err := NewLauncher("OpenCode", "opencode", AgentTypeOpenCode)
 
 	if err != nil {
 		t.Fatalf("NewLauncher() error = %v", err)
@@ -18,10 +18,13 @@ func TestNewLauncher_CreatesLauncherWithProvidedFields(t *testing.T) {
 	if l.Command != "opencode" {
 		t.Fatalf("NewLauncher() Command = %q, want %q", l.Command, "opencode")
 	}
+	if l.AgentType != AgentTypeOpenCode {
+		t.Fatalf("NewLauncher() AgentType = %q, want %q", l.AgentType, AgentTypeOpenCode)
+	}
 }
 
 func TestNewLauncher_TrimsFields(t *testing.T) {
-	l, err := NewLauncher("  Claude Code  ", "  claude --debug  ")
+	l, err := NewLauncher("  Claude Code  ", "  claude --debug  ", AgentTypeClaudeCode)
 	if err != nil {
 		t.Fatalf("NewLauncher() error = %v", err)
 	}
@@ -34,7 +37,7 @@ func TestNewLauncher_TrimsFields(t *testing.T) {
 }
 
 func TestNewLauncher_PreservesInternalWhitespaceInCommand(t *testing.T) {
-	l, err := NewLauncher("Claude", "claude  --verbose  --json")
+	l, err := NewLauncher("Claude", "claude  --verbose  --json", AgentTypeClaudeCode)
 	if err != nil {
 		t.Fatalf("NewLauncher() error = %v", err)
 	}
@@ -48,22 +51,30 @@ func TestNewLauncher_Validation(t *testing.T) {
 		name        string
 		displayName string
 		command     string
+		agentType   AgentType
 		wantErr     error
 	}{
-		{name: "empty display name", displayName: "", command: "x", wantErr: ErrLauncherEmptyDisplayName},
-		{name: "blank display name", displayName: "   ", command: "x", wantErr: ErrLauncherEmptyDisplayName},
-		{name: "empty command", displayName: "X", command: "", wantErr: ErrLauncherEmptyCommand},
-		{name: "blank command", displayName: "X", command: "   ", wantErr: ErrLauncherEmptyCommand},
-		{name: "display name too long", displayName: strings.Repeat("a", 101), command: "x", wantErr: ErrLauncherDisplayNameTooLong},
+		{name: "empty display name", displayName: "", command: "x", agentType: AgentTypeOpenCode, wantErr: ErrLauncherEmptyDisplayName},
+		{name: "blank display name", displayName: "   ", command: "x", agentType: AgentTypeOpenCode, wantErr: ErrLauncherEmptyDisplayName},
+		{name: "empty command", displayName: "X", command: "", agentType: AgentTypeOpenCode, wantErr: ErrLauncherEmptyCommand},
+		{name: "blank command", displayName: "X", command: "   ", agentType: AgentTypeOpenCode, wantErr: ErrLauncherEmptyCommand},
+		{name: "display name too long", displayName: strings.Repeat("a", 101), command: "x", agentType: AgentTypeOpenCode, wantErr: ErrLauncherDisplayNameTooLong},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewLauncher(tt.displayName, tt.command)
+			_, err := NewLauncher(tt.displayName, tt.command, tt.agentType)
 			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf("NewLauncher(%q, %q) error = %v, want %v", tt.displayName, tt.command, err, tt.wantErr)
+				t.Fatalf("NewLauncher(%q, %q, %q) error = %v, want %v", tt.displayName, tt.command, tt.agentType, err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestNewLauncher_RequiresAgentType(t *testing.T) {
+	_, err := NewLauncher("Claude", "claude", "")
+	if !errors.Is(err, ErrAgentTypeRequired) {
+		t.Fatalf("NewLauncher(\"Claude\", \"claude\", \"\") error = %v, want %v", err, ErrAgentTypeRequired)
 	}
 }
 
@@ -73,7 +84,7 @@ func TestLauncher_IsZero_ReportsEmptyLauncher(t *testing.T) {
 		t.Fatal("Launcher{}.IsZero() = false, want true for zero value")
 	}
 
-	l, err := NewLauncher("X", "x")
+	l, err := NewLauncher("X", "x", AgentTypeOpenCode)
 	if err != nil {
 		t.Fatalf("NewLauncher() error = %v", err)
 	}

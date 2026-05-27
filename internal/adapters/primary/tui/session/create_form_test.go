@@ -252,7 +252,7 @@ func newCreateFormSessionServiceWithMocks(t *testing.T) (service.SessionService,
 	projects := mocks.NewMockProjectRepository(t)
 	tmux := mocks.NewMockTmuxAdapter(t)
 	git := mocks.NewMockGitAdapter(t)
-	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode")
+	defaultLauncher, _ := domain.NewLauncher("OpenCode", "opencode", domain.AgentTypeOpenCode)
 	defaultEditor, _ := domain.NewEditor("VSCode", "code")
 	return *service.NewSessionService(repo, projects, tmux, git, paths.NewResolver(""), defaultLauncher, defaultEditor, slog.Default()), repo, projects, tmux, git
 }
@@ -266,11 +266,11 @@ func newProjectsServiceWithMocks(t *testing.T) (service.ProjectService, *mocks.M
 
 func testLaunchers(t *testing.T) []domain.Launcher {
 	t.Helper()
-	opencode, err := domain.NewLauncher("OpenCode", "opencode")
+	opencode, err := domain.NewLauncher("OpenCode", "opencode", domain.AgentTypeOpenCode)
 	if err != nil {
 		t.Fatalf("NewLauncher OpenCode: %v", err)
 	}
-	claude, err := domain.NewLauncher("Claude Code", "claude")
+	claude, err := domain.NewLauncher("Claude Code", "claude", domain.AgentTypeClaudeCode)
 	if err != nil {
 		t.Fatalf("NewLauncher Claude Code: %v", err)
 	}

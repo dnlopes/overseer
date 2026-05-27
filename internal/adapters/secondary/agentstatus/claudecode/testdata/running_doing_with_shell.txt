@@ -1,0 +1,50 @@
+
+
+[37m✻[39m [37mChurned for 2s[39m
+
+[37m[100m❯ [97mRun the bash command 'echo hello-from-claude'[39m
+
+[97m[49m⏺[39m I'll run that command.
+
+  [37mRan [1m1[0m[37m shell command [39m
+
+[97m⏺[39m hello-from-claude
+
+[37m✻[39m [37mCogitated for 4s[39m
+
+[37m[100m❯ [97mUse the Edit tool to change /tmp/nonexistent-file-xyz.txt - this should ask permission[39m
+
+[97m[49m⏺[39m I'll try to edit that file. Note that the Edit tool requires reading the file first, so let me try reading it.
+
+  [37mRead [1m1[0m[37m file [39m
+
+[97m⏺[39m The file doesn't exist, so I can't use Edit on it (Edit requires the file to exist and be read first). Would you like me to create the file with the Write tool instead?
+
+[37m✻[39m [37mBaked for 5s[39m
+
+[37m[100m❯ [97mRun the bash command: rm /tmp/some-test-file-doesnotexist[39m
+
+[49m  [37mRan [1m1[0m[37m shell command [39m
+
+[37m[100m❯ [97mUse your bash tool to print numbers 1 through 100[39m
+
+[49m  [37mRan [1m1[0m[37m shell command [39m
+
+[97m⏺[39m Done — printed 1 through 100.
+
+[37m✻[39m [37mCrunched for 3s[39m
+
+[37m[100m❯ [97mUse your bash tool to run: sleep 8 && echo done[39m
+
+[97m[49m⏺[39m I'll run that in the background since it takes a few seconds.
+
+[37m [39m Running [1m1[0m shell command…
+[37m  ⎿  $ sleep 8 && echo done[39m
+
+[91m✶[39m [91mDoing… [37m(2s · ↑[39m [37m107 tokens)[39m
+[37m  ⎿  Tip: Run /install-github-app to tag @claude right from your Github issues and PRs[39m
+
+[37m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ [7m[39m [0m
+[37m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [37mPR[39m [4m[93m]8;id=1y206ja;https://github.com/dnlopes/overseer/pull/11\#11[0m[37m]8;;\ · [96m1 shell[37m · esc to interrupt · ↓ to manage[39m
