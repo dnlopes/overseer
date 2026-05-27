@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -371,7 +372,52 @@ func (m Model) View() tea.View {
 			m.styles.EmptyState.Hint.Render("Press n to create one"),
 		}, "\n"), innerW, innerH)
 	}
-	return components.PanelWithTitle(m.styles, content, "Sessions", m.focused, m.width, m.height)
+	return components.PanelWithTitle(m.styles, content, agentStatusTitle(m.agentStatuses, m.styles.Glyphs), m.focused, m.width, m.height)
+}
+
+var agentStatusTitleOrder = []domain.AgentStatusKind{
+	domain.AgentStatusRunning,
+	domain.AgentStatusWaiting,
+	domain.AgentStatusDead,
+	domain.AgentStatusIdle,
+	domain.AgentStatusUnknown,
+}
+
+func agentStatusLabel(kind domain.AgentStatusKind) string {
+	switch kind {
+	case domain.AgentStatusRunning:
+		return "running"
+	case domain.AgentStatusWaiting:
+		return "waiting"
+	case domain.AgentStatusIdle:
+		return "idle"
+	case domain.AgentStatusDead:
+		return "dead"
+	default:
+		return "unknown"
+	}
+}
+
+func agentStatusTitle(statuses map[uuid.UUID]domain.AgentStatus, glyphs styles.Glyphs) string {
+	if len(statuses) == 0 {
+		return "Sessions"
+	}
+	counts := map[domain.AgentStatusKind]int{}
+	for _, st := range statuses {
+		counts[st.Kind]++
+	}
+	segments := make([]string, 0, len(agentStatusTitleOrder))
+	for _, kind := range agentStatusTitleOrder {
+		n := counts[kind]
+		if n == 0 {
+			continue
+		}
+		segments = append(segments, glyphs.AgentStatus(kind)+" "+strconv.Itoa(n)+" "+agentStatusLabel(kind))
+	}
+	if len(segments) == 0 {
+		return "Sessions"
+	}
+	return "Sessions (" + strings.Join(segments, " ") + ")"
 }
 
 func (m Model) loadSessions() tea.Cmd {

@@ -167,8 +167,7 @@ type Styles struct {
 		Default   lipgloss.Style
 		Highlight lipgloss.Style
 	}
-	StatusBar lipgloss.Style
-	Form   FormStyles
+	Form FormStyles
 	Danger struct {
 		Title lipgloss.Style
 		Body  lipgloss.Style
@@ -275,7 +274,6 @@ func NewWithTheme(themeName string, disableEmoji bool) *Styles {
 			Default:   lipgloss.NewStyle().Background(theme.HelpBg).Foreground(theme.Subtext).Padding(0, 1),
 			Highlight: lipgloss.NewStyle().Background(theme.Primary).Foreground(theme.TitleText).Padding(0, 1).Bold(true),
 		},
-		StatusBar: lipgloss.NewStyle().Foreground(theme.Subtext).Padding(0, 1),
 		Form: FormStyles{
 			Container: lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
