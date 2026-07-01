@@ -123,13 +123,6 @@ func Load(path string) (Config, error) {
 	if err := yamlv3.Unmarshal(data, &cfg); err != nil {
 		return Default(), errs.Wrap(errs.ErrInvalidInput, fmt.Sprintf("config: parse %s: %v", path, err))
 	}
-	if hasTopLevelKey(data, "launchers") {
-		cfg.Launchers = append(Default().Launchers, cfg.Launchers...)
-	}
-	if hasTopLevelKey(data, "editors") {
-		cfg.Editors = append(Default().Editors, cfg.Editors...)
-	}
-
 	if err := cfg.Validate(); err != nil {
 		return Default(), err
 	}
@@ -192,23 +185,6 @@ func isKnownAgentType(at string) bool {
 	switch domain.AgentType(at) {
 	case domain.AgentTypeClaudeCode, domain.AgentTypeOpenCode:
 		return true
-	}
-	return false
-}
-
-func hasTopLevelKey(data []byte, key string) bool {
-	var root yamlv3.Node
-	if err := yamlv3.Unmarshal(data, &root); err != nil {
-		return false
-	}
-	if len(root.Content) == 0 || root.Content[0].Kind != yamlv3.MappingNode {
-		return false
-	}
-
-	for i := 0; i+1 < len(root.Content[0].Content); i += 2 {
-		if root.Content[0].Content[i].Value == key {
-			return true
-		}
 	}
 	return false
 }

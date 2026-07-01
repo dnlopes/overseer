@@ -328,32 +328,23 @@ editors:
 	if cfg.Storage.DataDir != "/tmp/overseer" {
 		t.Errorf("Storage.DataDir: want /tmp/overseer, got %s", cfg.Storage.DataDir)
 	}
-	if len(cfg.Launchers) != 4 {
-		t.Fatalf("Launchers: want 4 entries, got %d", len(cfg.Launchers))
+	if len(cfg.Launchers) != 2 {
+		t.Fatalf("Launchers: want 2 entries (replacement), got %d", len(cfg.Launchers))
 	}
-	if cfg.Launchers[0].DisplayName != "OpenCode (default)" || cfg.Launchers[0].Command != "opencode" {
-		t.Errorf("Launchers[0]: want {OpenCode (default), opencode}, got %+v", cfg.Launchers[0])
+	if cfg.Launchers[0].DisplayName != "Custom Agent" || cfg.Launchers[0].Command != "my-agent --foo" {
+		t.Errorf("Launchers[0]: want {Custom Agent, my-agent --foo}, got %+v", cfg.Launchers[0])
 	}
-	if cfg.Launchers[1].DisplayName != "Claude Code (default)" || cfg.Launchers[1].Command != "claude" {
-		t.Errorf("Launchers[1]: want {Claude Code (default), claude}, got %+v", cfg.Launchers[1])
+	if cfg.Launchers[1].DisplayName != "Plain Bash" || cfg.Launchers[1].Command != "bash" {
+		t.Errorf("Launchers[1]: want {Plain Bash, bash}, got %+v", cfg.Launchers[1])
 	}
-	if cfg.Launchers[2].DisplayName != "Custom Agent" || cfg.Launchers[2].Command != "my-agent --foo" {
-		t.Errorf("Launchers[2]: want {Custom Agent, my-agent --foo}, got %+v", cfg.Launchers[2])
+	if len(cfg.Editors) != 2 {
+		t.Fatalf("Editors: want 2 entries (replacement), got %d", len(cfg.Editors))
 	}
-	if cfg.Launchers[3].DisplayName != "Plain Bash" || cfg.Launchers[3].Command != "bash" {
-		t.Errorf("Launchers[3]: want {Plain Bash, bash}, got %+v", cfg.Launchers[3])
+	if cfg.Editors[0].DisplayName != "Cursor" || cfg.Editors[0].Command != "cursor" {
+		t.Errorf("Editors[0]: want {Cursor, cursor}, got %+v", cfg.Editors[0])
 	}
-	if len(cfg.Editors) != 3 {
-		t.Fatalf("Editors: want 3 entries, got %d", len(cfg.Editors))
-	}
-	if cfg.Editors[0].DisplayName != "VSCode (default)" || cfg.Editors[0].Command != "code" {
-		t.Errorf("Editors[0]: want {VSCode (default), code}, got %+v", cfg.Editors[0])
-	}
-	if cfg.Editors[1].DisplayName != "Cursor" || cfg.Editors[1].Command != "cursor" {
-		t.Errorf("Editors[1]: want {Cursor, cursor}, got %+v", cfg.Editors[1])
-	}
-	if cfg.Editors[2].DisplayName != "Neovim" || cfg.Editors[2].Command != "nvim" {
-		t.Errorf("Editors[2]: want {Neovim, nvim}, got %+v", cfg.Editors[2])
+	if cfg.Editors[1].DisplayName != "Neovim" || cfg.Editors[1].Command != "nvim" {
+		t.Errorf("Editors[1]: want {Neovim, nvim}, got %+v", cfg.Editors[1])
 	}
 }
 
@@ -375,7 +366,7 @@ func TestLoad_RelativeDataDir_RejectedWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestLoad_ExplicitEmptyLaunchers_KeepsDefaults(t *testing.T) {
+func TestLoad_ExplicitEmptyLaunchers_ClearsDefaults(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 
@@ -388,8 +379,8 @@ func TestLoad_ExplicitEmptyLaunchers_KeepsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("explicit empty launchers should load cleanly, got: %v", err)
 	}
-	if len(cfg.Launchers) != 2 {
-		t.Errorf("Launchers: want 2 defaults, got %d", len(cfg.Launchers))
+	if len(cfg.Launchers) != 0 {
+		t.Errorf("Launchers: explicit empty list should clear defaults, got %d", len(cfg.Launchers))
 	}
 }
 
@@ -432,7 +423,7 @@ func TestLoad_LauncherMissingCommand_RejectedWithInvalidInput(t *testing.T) {
 	}
 }
 
-func TestLoad_ExplicitEmptyEditors_KeepsDefaults(t *testing.T) {
+func TestLoad_ExplicitEmptyEditors_ClearsDefaults(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 
@@ -445,8 +436,8 @@ func TestLoad_ExplicitEmptyEditors_KeepsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("explicit empty editors should load cleanly, got: %v", err)
 	}
-	if len(cfg.Editors) != 1 {
-		t.Errorf("Editors: want 1 default, got %d", len(cfg.Editors))
+	if len(cfg.Editors) != 0 {
+		t.Errorf("Editors: explicit empty list should clear defaults, got %d", len(cfg.Editors))
 	}
 }
 
