@@ -43,6 +43,7 @@ type sessionNode struct {
 	statusCode  string
 	updatedAt   time.Time
 	agentStatus domain.AgentStatusKind
+	groupIndex  int // 1-based index shown before project group rows
 }
 
 type Model struct {
@@ -202,8 +203,38 @@ func (m *Model) handleNavigationKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 			return cmd, true
 		}
 		return nil, true
+	default:
+		if n := digitFromKey(msg); n > 0 {
+			var cmd tea.Cmd
+			m.tree, cmd = m.tree.SelectNth(isGroupNode, n)
+			return m.translateTreeSelection(cmd), true
+		}
 	}
 	return nil, false
+}
+
+func digitFromKey(msg tea.KeyPressMsg) int {
+	switch msg.String() {
+	case "1":
+		return 1
+	case "2":
+		return 2
+	case "3":
+		return 3
+	case "4":
+		return 4
+	case "5":
+		return 5
+	case "6":
+		return 6
+	case "7":
+		return 7
+	case "8":
+		return 8
+	case "9":
+		return 9
+	}
+	return 0
 }
 
 func (m Model) requestDeleteSelected() tea.Cmd {
@@ -469,8 +500,8 @@ func projectSessionNodes(sessions []domain.Session, projectNames map[uuid.UUID]s
 		}
 		label := projectLabel(id, projectNames)
 		nodes[i] = components.TreeNode[sessionNode]{
-			ID:       "project:" + id.String(),
-			Item:     sessionNode{kind: sessionNodeGroup, projectID: id, label: label},
+			ID:   "project:" + id.String(),
+			Item: sessionNode{kind: sessionNodeGroup, projectID: id, label: label, groupIndex: i + 1},
 			Children: children,
 		}
 	}
@@ -522,7 +553,11 @@ func renderSessionNode(s *styles.Styles, labels []domain.Label) components.TreeR
 			if focused {
 				style = s.Group.HeaderSelected
 			}
-			return style.Render(prefix + item.label)
+			num := ""
+			if item.groupIndex > 0 {
+				num = strconv.Itoa(item.groupIndex) + ". "
+			}
+			return style.Render(prefix + num + item.label)
 		}
 
 		statusGlyph := s.Glyphs.AgentStatus(item.agentStatus)

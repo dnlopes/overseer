@@ -138,6 +138,42 @@ func TestTreeModel_MoveToPrevFindsMatchingItem(t *testing.T) {
 	}
 }
 
+func TestTreeModel_SelectNthFindsMatchingItem(t *testing.T) {
+	tree := newTreeWithTwoGroups().ExpandAll().Focus()
+
+	tree, cmd := tree.SelectNth(func(item string) bool { return item == "second" }, 1)
+
+	if got := tree.SelectedID(); got != "group-second" {
+		t.Fatalf("SelectedID() = %q, want %q", got, "group-second")
+	}
+	if cmd == nil {
+		t.Fatalf("SelectNth() cmd = nil, want selection emit")
+	}
+}
+
+func TestTreeModel_SelectNthNoMatchKeepsCursor(t *testing.T) {
+	tree := newTreeWithTwoGroups().ExpandAll().Focus()
+
+	tree, cmd := tree.SelectNth(func(item string) bool { return item == "nonexistent" }, 1)
+
+	if got := tree.SelectedID(); got != "group-first" {
+		t.Fatalf("SelectedID() = %q, want %q (unchanged)", got, "group-first")
+	}
+	if cmd != nil {
+		t.Fatalf("SelectNth() cmd = %#v, want nil when no match", cmd)
+	}
+}
+
+func TestTreeModel_SelectNthSameCursorReturnsNilCmd(t *testing.T) {
+	tree := newTreeWithTwoGroups().ExpandAll().Focus()
+
+	_, cmd := tree.SelectNth(func(item string) bool { return item == "first" }, 1)
+
+	if cmd != nil {
+		t.Fatalf("SelectNth() to current cursor cmd = %#v, want nil", cmd)
+	}
+}
+
 func newTreeWithTwoGroups() components.TreeModel[string] {
 	tree := components.NewTree(func(item string, _, _, _ int, _, _, _ bool) string {
 		return item

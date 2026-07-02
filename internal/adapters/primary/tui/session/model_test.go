@@ -43,7 +43,7 @@ func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 		t.Fatalf("initial SessionSelectedMsg.Session.ID = %v, want %v", msg.Session.ID, alpha.ID)
 	}
 	view := updated.(Model).View().Content
-	for _, want := range []string{"▼ overseer", "alpha", "beta"} {
+	for _, want := range []string{"▼ 1. overseer", "alpha", "beta"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("View() missing %q: %q", want, view)
 		}
@@ -728,7 +728,7 @@ func TestModel_CollapseStatePersistsAcrossRebuilds(t *testing.T) {
 	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
 	m := updated.(Model)
 	view := m.View().Content
-	if !strings.Contains(view, "▼ overseer") {
+	if !strings.Contains(view, "▼ 1. overseer") {
 		t.Fatalf("initial view missing expanded group: %q", view)
 	}
 
@@ -737,7 +737,7 @@ func TestModel_CollapseStatePersistsAcrossRebuilds(t *testing.T) {
 	updated, _ = m.Update(keyPress(" "))
 	m = updated.(Model)
 	view = m.View().Content
-	if !strings.Contains(view, "▶ overseer") {
+	if !strings.Contains(view, "▶ 1. overseer") {
 		t.Fatalf("view missing collapsed group after toggle: %q", view)
 	}
 
@@ -745,7 +745,7 @@ func TestModel_CollapseStatePersistsAcrossRebuilds(t *testing.T) {
 	updated, _ = m.Update(shared.AgentStatusesUpdatedMsg{Statuses: map[uuid.UUID]domain.AgentStatus{}})
 	m = updated.(Model)
 	view = m.View().Content
-	if !strings.Contains(view, "▶ overseer") {
+	if !strings.Contains(view, "▶ 1. overseer") {
 		t.Fatalf("group re-expanded after AgentStatusesUpdatedMsg; want collapsed: %q", view)
 	}
 
@@ -753,7 +753,31 @@ func TestModel_CollapseStatePersistsAcrossRebuilds(t *testing.T) {
 	updated, _ = m.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
 	m = updated.(Model)
 	view = m.View().Content
-	if !strings.Contains(view, "▶ overseer") {
+	if !strings.Contains(view, "▶ 1. overseer") {
 		t.Fatalf("group re-expanded after SessionsLoadedMsg; want collapsed: %q", view)
+	}
+}
+
+func TestModel_DigitKeyJumpsToProjectGroup(t *testing.T) {
+	overseerID := uuid.New()
+	otherID := uuid.New()
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSession("alpha", overseerID)
+	beta := testutil.MakeSession("beta", otherID)
+
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
+
+	updated, cmd := updated.(Model).Update(keyPress("2"))
+
+	msg := cmd()
+	if _, ok := msg.(shared.SessionSelectionClearedMsg); !ok {
+		t.Fatalf("cmd() type = %T, want shared.SessionSelectionClearedMsg", msg)
+	}
+	view := ansi.Strip(updated.(Model).View().Content)
+	if !strings.Contains(view, "2. overseer") {
+		t.Fatalf("View() missing focused '2. overseer' after digit jump: %q", view)
 	}
 }
