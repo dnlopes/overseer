@@ -58,6 +58,7 @@ type Model struct {
 	height         int
 	err            error
 	agentStatuses  map[uuid.UUID]domain.AgentStatus
+	loadedOnce     bool
 }
 
 func New(s *styles.Styles, service service.SessionService, labels []domain.Label) Model {
@@ -79,7 +80,7 @@ func (m *Model) SetProjectNames(names map[uuid.UUID]string) {
 }
 
 func (m *Model) rebuildTree() {
-	m.tree = m.tree.SetNodes(m.sessionTreeNodes()).ExpandAll()
+	m.tree = m.tree.SetNodes(m.sessionTreeNodes())
 }
 
 func (m Model) Init() tea.Cmd {
@@ -95,6 +96,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.sessions = msg.Sessions
 		m.rebuildTree()
+		if !m.loadedOnce {
+			m.tree = m.tree.ExpandAll()
+			m.loadedOnce = true
+		}
 		if len(m.sessions) == 0 {
 			return m, nil
 		}

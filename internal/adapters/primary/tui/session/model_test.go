@@ -714,3 +714,46 @@ func bgColorTriplet(c interface {
 	r, g, b, _ := c.RGBA()
 	return fmt.Sprintf("48;2;%d;%d;%d", r>>8, g>>8, b>>8)
 }
+
+func TestModel_CollapseStatePersistsAcrossRebuilds(t *testing.T) {
+	overseerID := uuid.New()
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSession("alpha", overseerID)
+	beta := testutil.MakeSession("beta", overseerID)
+
+	// First load — expands all by default.
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
+	m := updated.(Model)
+	view := m.View().Content
+	if !strings.Contains(view, "▼ overseer") {
+		t.Fatalf("initial view missing expanded group: %q", view)
+	}
+
+	// Move cursor to the project group row and collapse it with space.
+	m.tree = m.tree.SelectID("project:" + overseerID.String())
+	updated, _ = m.Update(keyPress(" "))
+	m = updated.(Model)
+	view = m.View().Content
+	if !strings.Contains(view, "▶ overseer") {
+		t.Fatalf("view missing collapsed group after toggle: %q", view)
+	}
+
+	// Simulate a background rebuild (e.g. agent-status refresh).
+	updated, _ = m.Update(shared.AgentStatusesUpdatedMsg{Statuses: map[uuid.UUID]domain.AgentStatus{}})
+	m = updated.(Model)
+	view = m.View().Content
+	if !strings.Contains(view, "▶ overseer") {
+		t.Fatalf("group re-expanded after AgentStatusesUpdatedMsg; want collapsed: %q", view)
+	}
+
+	// Simulate a session reload (not the first one).
+	updated, _ = m.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
+	m = updated.(Model)
+	view = m.View().Content
+	if !strings.Contains(view, "▶ overseer") {
+		t.Fatalf("group re-expanded after SessionsLoadedMsg; want collapsed: %q", view)
+	}
+}
