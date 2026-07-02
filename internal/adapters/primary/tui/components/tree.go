@@ -238,6 +238,29 @@ func (m TreeModel[T]) MoveToPrev(pred func(item T) bool) (TreeModel[T], tea.Cmd)
 	return m, nil
 }
 
+// SelectNth moves the cursor to the nth row (1-based) whose item matches
+// pred. If fewer than n matching rows exist, the cursor stays put.
+// Returns a cmd that emits a [TreeSelectMsg] if the cursor moved.
+func (m TreeModel[T]) SelectNth(pred func(item T) bool, n int) (TreeModel[T], tea.Cmd) {
+	if len(m.rows) == 0 || pred == nil || n <= 0 {
+		return m, nil
+	}
+	count := 0
+	for i, r := range m.rows {
+		if pred(r.item) {
+			count++
+			if count == n {
+				if m.cursor == i {
+					return m, nil
+				}
+				m.cursor = i
+				return m, m.emitSelection()
+			}
+		}
+	}
+	return m, nil
+}
+
 // RowCount returns the number of currently visible (post-flatten) rows.
 func (m TreeModel[T]) RowCount() int {
 	return len(m.rows)

@@ -43,7 +43,7 @@ func TestModel_SessionsLoadedRendersProjectTree(t *testing.T) {
 		t.Fatalf("initial SessionSelectedMsg.Session.ID = %v, want %v", msg.Session.ID, alpha.ID)
 	}
 	view := updated.(Model).View().Content
-	for _, want := range []string{"▼ overseer", "alpha", "beta"} {
+	for _, want := range []string{"▼ 1 overseer", "alpha", "beta"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("View() missing %q: %q", want, view)
 		}
@@ -713,4 +713,29 @@ func bgColorTriplet(c interface {
 }) string {
 	r, g, b, _ := c.RGBA()
 	return fmt.Sprintf("48;2;%d;%d;%d", r>>8, g>>8, b>>8)
+}
+
+func TestModel_DigitKeyJumpsToProjectGroup(t *testing.T) {
+	overseerID := uuid.New()
+	otherID := uuid.New()
+	model := New(styles.New(), newSessionService(t), domain.DefaultLabels)
+	model.SetProjectNames(map[uuid.UUID]string{overseerID: "overseer", otherID: "other"})
+	model.SetSize(80, 20)
+	model.SetFocus(true)
+	alpha := testutil.MakeSession("alpha", overseerID)
+	beta := testutil.MakeSession("beta", otherID)
+
+	updated, _ := model.Update(shared.SessionsLoadedMsg{Sessions: []domain.Session{alpha, beta}})
+
+	updated, cmd := updated.(Model).Update(keyPress("2"))
+
+	msg := cmd()
+	if _, ok := msg.(shared.SessionSelectionClearedMsg); !ok {
+		t.Fatalf("cmd() type = %T, want shared.SessionSelectionClearedMsg", msg)
+	}
+	view := ansi.Strip(updated.(Model).View().Content)
+	// Projects are sorted alphabetically: "other" (1), "overseer" (2)
+	if !strings.Contains(view, "2 overseer") {
+		t.Fatalf("View() missing focused '2 overseer' after digit jump: %q", view)
+	}
 }

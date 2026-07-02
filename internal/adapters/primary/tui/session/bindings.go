@@ -1,6 +1,10 @@
 package session
 
-import "charm.land/bubbles/v2/key"
+import (
+	"strconv"
+
+	"charm.land/bubbles/v2/key"
+)
 
 const jumpRowDelta = 5
 
@@ -27,4 +31,13 @@ var (
 	DeleteSessionKeyBinding        = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete session"))
 	deleteConfirmKeyBinding        = key.NewBinding(key.WithKeys("y", "enter"), key.WithHelp("y/enter", "confirm delete"))
 	deleteCancelKeyBinding         = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel"))
+
+	DigitKeyBindings = func() []key.Binding {
+		b := make([]key.Binding, 9)
+		for i := 0; i < 9; i++ {
+			digit := strconv.Itoa(i + 1)
+			b[i] = key.NewBinding(key.WithKeys(digit), key.WithHelp(digit, "go to project "+digit))
+		}
+		return b
+	}()
 )
