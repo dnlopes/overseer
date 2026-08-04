@@ -81,8 +81,8 @@ func TestSessionService_Create_WorktreeMode_HappyPath(t *testing.T) {
 	repoPath := expectProjectLookup(t, projects, overseerID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -104,6 +104,10 @@ func TestSessionService_Create_WorktreeMode_HappyPath(t *testing.T) {
 	}
 	if resp.Session.Order != 1 {
 		t.Fatalf("Create() Session.Order = %d, want 1", resp.Session.Order)
+	}
+	wantTmuxName := domain.TmuxSessionName("overseer", "alpha", resp.Session.ID)
+	if resp.Session.TmuxName != wantTmuxName {
+		t.Fatalf("Create() Session.TmuxName = %q, want %q", resp.Session.TmuxName, wantTmuxName)
 	}
 	if !resp.Session.HasWorktree() {
 		t.Fatalf("Create() Session.HasWorktree() = false, want true for worktree-mode session")
@@ -127,8 +131,8 @@ func TestSessionService_Create_ProjectMode_SkipsGit_PersistsWithoutWorktree(t *t
 
 	repoPath := expectProjectLookup(t, projects, overseerID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), repoPath, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), repoPath, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), repoPath, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), repoPath, "opencode").Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -178,8 +182,8 @@ func TestSessionService_Create_WorktreeMode_EmptyBaseBranch_ResolvesProjectDefau
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().GetDefaultBranch(mock.Anything, repoPath).Return("trunk", nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "trunk", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -223,8 +227,8 @@ func TestSessionService_Create_WorktreeMode_UsesUserProvidedBranch(t *testing.T)
 	repoPath := expectProjectLookup(t, projects, projID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", "my-feature", mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -258,8 +262,8 @@ func TestSessionService_Create_WorktreeMode_BlankBranchGeneratesDefault(t *testi
 	repoPath := expectProjectLookup(t, projects, projID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -304,8 +308,8 @@ func TestSessionService_Create_DuplicateNameAcrossProjectsAllowed(t *testing.T) 
 	repoPath := expectProjectLookup(t, projects, overseerID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{existing}, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -331,8 +335,8 @@ func TestSessionService_Create_OrderIncrement(t *testing.T) {
 	repo.EXPECT().List(mock.Anything).
 		Return([]domain.Session{first, second, otherProject}, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-gamma", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-gamma-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("tmux-gamma", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").Return("tmux-gamma-agent", nil).Once()
 
 	var savedSession domain.Session
 	repo.EXPECT().Save(mock.Anything, mock.Anything).
@@ -361,11 +365,11 @@ func TestSessionService_Create_AgentTmuxErrorKillsShellAndPropagates(t *testing.
 	repoPath := expectProjectLookup(t, projects, projID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").
 		Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").
 		Return("", tmuxErr).Once()
-	tmux.EXPECT().KillSession(mock.Anything, testutil.UUIDString()).Return(nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, testutil.TmuxNameString()).Return(nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), worktreeCreateReq("alpha", projID, "main"))
@@ -382,7 +386,7 @@ func TestSessionService_Create_TmuxError(t *testing.T) {
 	repoPath := expectProjectLookup(t, projects, projID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("", tmuxErr).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("", tmuxErr).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.Create(context.Background(), worktreeCreateReq("alpha", projID, "main"))
@@ -428,9 +432,9 @@ func TestSessionService_Create_WithAgentCommand(t *testing.T) {
 	repoPath := expectProjectLookup(t, projects, projID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").
 		Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "claude").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "claude").
 		Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
@@ -482,9 +486,9 @@ func TestSessionService_Create_WithEditorCommand(t *testing.T) {
 	repoPath := expectProjectLookup(t, projects, projID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").
 		Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").
 		Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
@@ -520,9 +524,9 @@ func TestCreateSession_CapturesAgentTypeFromLauncher(t *testing.T) {
 	repoPath := expectProjectLookup(t, projects, projID, "overseer")
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, repoPath, "main", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").
 		Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "claude").
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "claude").
 		Return("tmux-alpha-agent", nil).Once()
 
 	var savedSession domain.Session
@@ -851,10 +855,10 @@ func TestSessionService_AttachShell_HappyPath(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
-		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
-	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.ID.String())
-	tmux.EXPECT().AttachCommand(mock.Anything, sess.ID.String()).Return(wantCmd, nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
+		Return(domain.TmuxSession{ID: sess.TmuxName}, nil).Once()
+	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.TmuxName)
+	tmux.EXPECT().AttachCommand(mock.Anything, sess.TmuxName).Return(wantCmd, nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
@@ -886,12 +890,12 @@ func TestSessionService_AttachShell_TmuxSessionMissing_RecreatesAtWorktreePath(t
 	sess := testutil.MakeSessionWithWorktree("alpha", uuid.New(), worktreePath, "overseer/alpha")
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
 		Return(domain.TmuxSession{}, domain.ErrTmuxSessionNotFound).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, sess.ID.String(), worktreePath, "").
-		Return(sess.ID.String(), nil).Once()
-	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.ID.String())
-	tmux.EXPECT().AttachCommand(mock.Anything, sess.ID.String()).Return(wantCmd, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, sess.TmuxName, worktreePath, "").
+		Return(sess.TmuxName, nil).Once()
+	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.TmuxName)
+	tmux.EXPECT().AttachCommand(mock.Anything, sess.TmuxName).Return(wantCmd, nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
@@ -912,13 +916,13 @@ func TestSessionService_AttachShell_ProjectMode_TmuxMissing_RecreatesAtProjectPa
 
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
 		Return(domain.TmuxSession{}, domain.ErrTmuxSessionNotFound).Once()
 	projects.EXPECT().Get(mock.Anything, overseerID).Return(project, nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, sess.ID.String(), project.Path, "").
-		Return(sess.ID.String(), nil).Once()
-	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.ID.String())
-	tmux.EXPECT().AttachCommand(mock.Anything, sess.ID.String()).Return(wantCmd, nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, sess.TmuxName, project.Path, "").
+		Return(sess.TmuxName, nil).Once()
+	wantCmd := exec.Command("tmux", "attach-session", "-t", sess.TmuxName)
+	tmux.EXPECT().AttachCommand(mock.Anything, sess.TmuxName).Return(wantCmd, nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.AttachShell(context.Background(), AttachShellRequest{ID: sess.ID})
@@ -932,7 +936,7 @@ func TestSessionService_AttachAgent_HappyPath(t *testing.T) {
 	if err := sess.AssignAgentCommand("opencode"); err != nil {
 		t.Fatalf("seed AssignAgentCommand: %v", err)
 	}
-	agentTmuxID := sess.ID.String() + "-agent"
+	agentTmuxID := sess.AgentTmuxName()
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
 	tmux.EXPECT().GetSession(mock.Anything, agentTmuxID).
@@ -957,7 +961,7 @@ func TestSessionService_AttachAgent_AgentTmuxMissing_RecreatesWithCommand(t *tes
 	if err := sess.AssignAgentCommand("opencode --config /tmp/cfg"); err != nil {
 		t.Fatalf("seed AssignAgentCommand: %v", err)
 	}
-	agentTmuxID := sess.ID.String() + "-agent"
+	agentTmuxID := sess.AgentTmuxName()
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
 	tmux.EXPECT().GetSession(mock.Anything, agentTmuxID).
@@ -1010,7 +1014,7 @@ func TestSessionService_PreviewSession_Shell_ReturnsContent(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()).Return("shell content", nil).Once()
+	tmux.EXPECT().CapturePane(mock.Anything, sess.TmuxName).Return("shell content", nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	resp, err := svc.PreviewSession(context.Background(), PreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
@@ -1030,7 +1034,7 @@ func TestSessionService_PreviewSession_TmuxSessionMissing_ReturnsNotReady(t *tes
 	sess := testutil.MakeSession("alpha", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()+"-agent").
+	tmux.EXPECT().CapturePane(mock.Anything, sess.AgentTmuxName()).
 		Return("", domain.ErrTmuxSessionNotFound).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
@@ -1048,9 +1052,9 @@ func TestSessionService_KillPreviewSession_Shell(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
-		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
+		Return(domain.TmuxSession{ID: sess.TmuxName}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.TmuxName).Return(nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.KillPreviewSession(context.Background(), KillPreviewSessionRequest{ID: sess.ID, Kind: PreviewKindShell})
@@ -1064,9 +1068,9 @@ func TestSessionService_KillPreviewSession_Agent(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()+"-agent").
-		Return(domain.TmuxSession{ID: sess.ID.String() + "-agent"}, nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()+"-agent").Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.AgentTmuxName()).
+		Return(domain.TmuxSession{ID: sess.AgentTmuxName()}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.AgentTmuxName()).Return(nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
 	_, err := svc.KillPreviewSession(context.Background(), KillPreviewSessionRequest{ID: sess.ID, Kind: PreviewKindAgent})
@@ -1080,7 +1084,7 @@ func TestSessionService_KillPreviewSession_AlreadyGone(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
 		Return(domain.TmuxSession{}, domain.ErrTmuxSessionNotFound).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
@@ -1126,9 +1130,9 @@ func TestSessionService_Delete_HappyPath_WorktreeSession(t *testing.T) {
 	project.ID = overseerID
 	projects.EXPECT().Get(mock.Anything, overseerID).Return(project, nil).Once()
 	git.EXPECT().RemoveWorktree(mock.Anything, "/repo/overseer", sess.WorktreePath).Return(nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
-		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
+		Return(domain.TmuxSession{ID: sess.TmuxName}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.TmuxName).Return(nil).Once()
 	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
@@ -1144,9 +1148,9 @@ func TestSessionService_Delete_HappyPath_ProjectMode_NoGitCall(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
-		Return(domain.TmuxSession{ID: sess.ID.String()}, nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
+		Return(domain.TmuxSession{ID: sess.TmuxName}, nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.TmuxName).Return(nil).Once()
 	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
 
 	svc := newTestSessionService(repo, projects, tmux, git, testLogger())
@@ -1195,7 +1199,7 @@ func TestSessionService_Delete_TmuxSessionAlreadyGone_StillDeletes(t *testing.T)
 	sess := testutil.MakeSession("orphan", uuid.New())
 	repo, projects, tmux, git := newSessionMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
 		Return(domain.TmuxSession{}, domain.ErrTmuxSessionNotFound).Once()
 	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
 

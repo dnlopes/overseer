@@ -94,8 +94,8 @@ func TestCreateForm_SubmitProjectMode_SendsCreateWorktreeFalseAndNoBranch(t *tes
 	svc, repo, projects, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	projects.EXPECT().Get(mock.Anything, overseer.ID).Return(overseer, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), overseer.Path, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), overseer.Path, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), overseer.Path, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), overseer.Path, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -129,8 +129,8 @@ func TestCreateForm_SubmitWorktreeMode_PassesPickedBaseBranch(t *testing.T) {
 	projects.EXPECT().Get(mock.Anything, overseer.ID).Return(overseer, nil).Once()
 	repo.EXPECT().List(mock.Anything).Return(nil, nil).Once()
 	git.EXPECT().CreateWorktree(mock.Anything, overseer.Path, "feat/foo", mock.Anything, mock.Anything).Return(nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.UUIDString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
-	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxIDString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.TmuxNameString(), mock.Anything, "").Return("tmux-alpha", nil).Once()
+	tmux.EXPECT().CreateSession(mock.Anything, testutil.AgentTmuxNameString(), mock.Anything, "opencode").Return("tmux-alpha-agent", nil).Once()
 	repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 	projects.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Once()
 

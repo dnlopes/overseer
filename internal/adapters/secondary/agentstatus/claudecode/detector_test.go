@@ -84,7 +84,7 @@ func TestPaneDetector_Detect_IdleFixtures(t *testing.T) {
 
 func TestPaneDetector_Detect_EmptyPane_ReturnsUnknown(t *testing.T) {
 	d, tmux, sess := newDetectorWithStub(t)
-	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()+"-agent").Return("", nil).Once()
+	tmux.EXPECT().CapturePane(mock.Anything, sess.AgentTmuxName()).Return("", nil).Once()
 
 	got, err := d.Detect(context.Background(), sess)
 	if err != nil {
@@ -98,7 +98,7 @@ func TestPaneDetector_Detect_EmptyPane_ReturnsUnknown(t *testing.T) {
 func TestPaneDetector_Detect_TmuxError_PropagatesAsError(t *testing.T) {
 	d, tmux, sess := newDetectorWithStub(t)
 	wantErr := errors.New("tmux exploded")
-	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()+"-agent").Return("", wantErr).Once()
+	tmux.EXPECT().CapturePane(mock.Anything, sess.AgentTmuxName()).Return("", wantErr).Once()
 
 	_, err := d.Detect(context.Background(), sess)
 	if err == nil {
@@ -121,7 +121,7 @@ func detectFromFixture(t *testing.T, name string) domain.AgentStatus {
 	}
 
 	d, tmux, sess := newDetectorWithStub(t)
-	tmux.EXPECT().CapturePane(mock.Anything, sess.ID.String()+"-agent").Return(string(data), nil).Once()
+	tmux.EXPECT().CapturePane(mock.Anything, sess.AgentTmuxName()).Return(string(data), nil).Once()
 
 	got, err := d.Detect(context.Background(), sess)
 	if err != nil {
@@ -138,5 +138,6 @@ func newDetectorWithStub(t *testing.T) (*PaneDetector, *mocks.MockTmuxAdapter, d
 	tmux := mocks.NewMockTmuxAdapter(t)
 	d := NewPaneDetector(tmux)
 	sess := domain.Session{ID: uuid.New(), AgentType: domain.AgentTypeClaudeCode}
+	sess.AssignTmuxName("project")
 	return d, tmux, sess
 }

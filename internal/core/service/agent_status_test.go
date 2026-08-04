@@ -21,8 +21,8 @@ func TestAgentStatusService_PollAll_RoutesByAgentType(t *testing.T) {
 
 	repo, tmux, registry := newAgentStatusMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{claudeSess, openCodeSess}, nil).Once()
-	expectAgentTmuxAlive(tmux, claudeSess.ID)
-	expectAgentTmuxAlive(tmux, openCodeSess.ID)
+	expectAgentTmuxAlive(tmux, claudeSess)
+	expectAgentTmuxAlive(tmux, openCodeSess)
 
 	claudeDetector := stubDetectorReturning(t, domain.AgentTypeClaudeCode, runningStatus("claude/test"))
 	openCodeDetector := stubDetectorReturning(t, domain.AgentTypeOpenCode, idleStatus("opencode/test"))
@@ -48,7 +48,7 @@ func TestAgentStatusService_PollAll_RoutesByAgentType(t *testing.T) {
 func TestAgentStatusService_PollAll_ReturnsDeadWhenAgentTmuxMissing(t *testing.T) {
 	ctx := context.Background()
 	sess := newSessionFixture(domain.AgentTypeClaudeCode)
-	agentTmuxID := sess.ID.String() + "-agent"
+	agentTmuxID := sess.AgentTmuxName()
 
 	repo, tmux, registry := newAgentStatusMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{sess}, nil).Once()
@@ -77,7 +77,7 @@ func TestAgentStatusService_PollAll_ReturnsDeadWhenAgentTmuxMissing(t *testing.T
 func TestAgentStatusService_PollAll_TmuxError_DegradesToUnknown(t *testing.T) {
 	ctx := context.Background()
 	sess := newSessionFixture(domain.AgentTypeClaudeCode)
-	agentTmuxID := sess.ID.String() + "-agent"
+	agentTmuxID := sess.AgentTmuxName()
 
 	repo, tmux, registry := newAgentStatusMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{sess}, nil).Once()
@@ -99,7 +99,7 @@ func TestAgentStatusService_PollAll_NoDetectorForAgentType_ReturnsUnknown(t *tes
 
 	repo, tmux, registry := newAgentStatusMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{sess}, nil).Once()
-	expectAgentTmuxAlive(tmux, sess.ID)
+	expectAgentTmuxAlive(tmux, sess)
 	registry.EXPECT().DetectorFor(domain.AgentTypeUnknown).Return(nil, false).Once()
 
 	svc := newAgentStatusServiceWithDeps(repo, tmux, registry)
@@ -122,7 +122,7 @@ func TestAgentStatusService_PollAll_DetectorError_DegradesToUnknown(t *testing.T
 
 	repo, tmux, registry := newAgentStatusMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{sess}, nil).Once()
-	expectAgentTmuxAlive(tmux, sess.ID)
+	expectAgentTmuxAlive(tmux, sess)
 
 	detector := mocks.NewMockAgentStatusDetector(t)
 	detector.EXPECT().Detect(mock.Anything, sess).Return(domain.AgentStatus{}, errors.New("boom")).Once()
@@ -144,7 +144,7 @@ func TestAgentStatusService_PollAll_RespectsDetectorTimeout(t *testing.T) {
 
 	repo, tmux, registry := newAgentStatusMocks(t)
 	repo.EXPECT().List(mock.Anything).Return([]domain.Session{sess}, nil).Once()
-	expectAgentTmuxAlive(tmux, sess.ID)
+	expectAgentTmuxAlive(tmux, sess)
 
 	gotDeadline := atomic.Bool{}
 	detector := mocks.NewMockAgentStatusDetector(t)
@@ -215,12 +215,14 @@ func newAgentStatusServiceWithDeps(
 }
 
 func newSessionFixture(at domain.AgentType) domain.Session {
-	return domain.Session{ID: uuid.New(), Name: "fixture", AgentType: at}
+	sess := domain.Session{ID: uuid.New(), Name: "fixture", AgentType: at}
+	sess.AssignTmuxName("project")
+	return sess
 }
 
-func expectAgentTmuxAlive(tmux *mocks.MockTmuxAdapter, sessID uuid.UUID) {
-	tmux.EXPECT().GetSession(mock.Anything, sessID.String()+"-agent").
-		Return(domain.TmuxSession{ID: sessID.String() + "-agent"}, nil).Once()
+func expectAgentTmuxAlive(tmux *mocks.MockTmuxAdapter, sess domain.Session) {
+	tmux.EXPECT().GetSession(mock.Anything, sess.AgentTmuxName()).
+		Return(domain.TmuxSession{ID: sess.AgentTmuxName()}, nil).Once()
 }
 
 func stubDetectorReturning(t *testing.T, at domain.AgentType, status domain.AgentStatus) *mocks.MockAgentStatusDetector {

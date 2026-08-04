@@ -39,7 +39,7 @@ func (d *PaneDetector) AgentType() domain.AgentType {
 }
 
 func (d *PaneDetector) Detect(ctx context.Context, sess domain.Session) (domain.AgentStatus, error) {
-	agentTmuxID := sess.ID.String() + "-agent"
+	agentTmuxID := sess.AgentTmuxName()
 	raw, err := d.tmux.CapturePane(ctx, agentTmuxID)
 	if err != nil {
 		return domain.AgentStatus{}, fmt.Errorf("capture pane: %w", err)

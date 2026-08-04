@@ -455,3 +455,70 @@ func TestSession_AssignAgentType_Validates(t *testing.T) {
 		}
 	})
 }
+
+func TestTmuxSessionName_FollowsRepositoryNameGuidConvention(t *testing.T) {
+	id := uuid.MustParse("12345678-9abc-def0-1234-56789abcdef0")
+
+	got := TmuxSessionName("overseer", "alpha", id)
+
+	if got != "overseer-alpha-12345678" {
+		t.Fatalf("TmuxSessionName() = %q, want %q", got, "overseer-alpha-12345678")
+	}
+}
+
+func TestTmuxSessionName_KebabCasesComponents(t *testing.T) {
+	id := uuid.MustParse("12345678-9abc-def0-1234-56789abcdef0")
+	tests := []struct {
+		name       string
+		repository string
+		session    string
+		want       string
+	}{
+		{name: "uppercase is lowercased", repository: "OverSeer", session: "Alpha", want: "overseer-alpha-12345678"},
+		{name: "dots become dashes", repository: "Overseer.TUI", session: "alpha", want: "overseer-tui-alpha-12345678"},
+		{name: "double colons become dashes", repository: "overseer", session: "fix::bugs", want: "overseer-fix-bugs-12345678"},
+		{name: "semicolons become dashes", repository: "overseer", session: "a;b", want: "overseer-a-b-12345678"},
+		{name: "spaces become dashes", repository: "overseer", session: "my session", want: "overseer-my-session-12345678"},
+		{name: "runs of weird chars collapse to one dash", repository: "over--seer", session: "a :: .. b", want: "over-seer-a-b-12345678"},
+		{name: "leading and trailing separators are trimmed", repository: ".overseer.", session: " alpha ", want: "overseer-alpha-12345678"},
+		{name: "underscores become dashes", repository: "my_repo", session: "my_session", want: "my-repo-my-session-12345678"},
+		{name: "emoji and non-ascii are stripped", repository: "over💥seer", session: "café", want: "over-seer-caf-12345678"},
+		{name: "empty repository falls back", repository: "", session: "alpha", want: "repository-alpha-12345678"},
+		{name: "weird-only repository falls back", repository: ":::", session: "alpha", want: "repository-alpha-12345678"},
+		{name: "weird-only session name falls back", repository: "overseer", session: "💥💥", want: "overseer-session-12345678"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TmuxSessionName(tt.repository, tt.session, id)
+			if got != tt.want {
+				t.Fatalf("TmuxSessionName(%q, %q) = %q, want %q", tt.repository, tt.session, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSession_AssignTmuxName_DerivesAndPersists(t *testing.T) {
+	s, _ := NewSession("Fix: login bug", uuid.New())
+	originalUpdated := s.UpdatedAt
+	time.Sleep(time.Millisecond)
+
+	s.AssignTmuxName("Overseer.TUI")
+
+	want := TmuxSessionName("Overseer.TUI", "Fix: login bug", s.ID)
+	if s.TmuxName != want {
+		t.Fatalf("TmuxName = %q, want %q", s.TmuxName, want)
+	}
+	if !s.UpdatedAt.After(originalUpdated) {
+		t.Fatalf("UpdatedAt = %v, want after %v", s.UpdatedAt, originalUpdated)
+	}
+}
+
+func TestSession_AgentTmuxName_AppendsAgentSuffix(t *testing.T) {
+	s, _ := NewSession("alpha", uuid.New())
+	s.AssignTmuxName("overseer")
+
+	if got := s.AgentTmuxName(); got != s.TmuxName+"-agent" {
+		t.Fatalf("AgentTmuxName() = %q, want %q", got, s.TmuxName+"-agent")
+	}
+}

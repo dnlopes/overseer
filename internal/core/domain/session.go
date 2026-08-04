@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,8 +38,12 @@ type Session struct {
 	EditorCommand string
 	AgentType     AgentType `json:",omitempty"`
 	Label         string    `json:",omitempty"`
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// TmuxName is the tmux session name assigned at creation time (see
+	// TmuxSessionName). It is persisted rather than derived on the fly so it
+	// stays stable when the session or project is later renamed.
+	TmuxName  string `json:",omitempty"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // NewSession constructs a Session with no worktree assigned. For a Mode 1
@@ -199,6 +204,50 @@ func (s *Session) AssignLabel(code string) error {
 	s.Label = code
 	s.UpdatedAt = time.Now()
 	return nil
+}
+
+// tmuxNameComponentInvalid matches any run of characters that are not
+// lowercase ASCII alphanumerics; each run collapses into a single dash.
+var tmuxNameComponentInvalid = regexp.MustCompile(`[^a-z0-9]+`)
+
+// TmuxSessionName builds the tmux session name for a session following the
+// convention "<repository>-<session-name>-<small-guid>". Both components are
+// kebab-cased (lowercased, any run of characters outside [a-z0-9] collapsed
+// to a single dash, dashes trimmed from the ends) because tmux session names
+// reject '.' and ':' and the raw names routinely contain them. The small
+// guid — the first 8 hex characters of the session UUID — keeps the name
+// unique when two sessions sanitize to the same string. A component that
+// sanitizes to nothing falls back to a fixed token so the convention's
+// shape is preserved.
+func TmuxSessionName(repository, sessionName string, id uuid.UUID) string {
+	return kebabComponent(repository, "repository") + "-" +
+		kebabComponent(sessionName, "session") + "-" +
+		id.String()[:8]
+}
+
+func kebabComponent(s, fallback string) string {
+	s = tmuxNameComponentInvalid.ReplaceAllString(strings.ToLower(s), "-")
+	s = strings.Trim(s, "-")
+	if s == "" {
+		return fallback
+	}
+	return s
+}
+
+// AssignTmuxName derives and records the session's tmux session name from
+// the project (repository) name. Called once at creation; the value is
+// persisted and never recomputed, so later renames do not invalidate the
+// name the tmux server already knows.
+func (s *Session) AssignTmuxName(repository string) {
+	s.TmuxName = TmuxSessionName(repository, s.Name, s.ID)
+	s.UpdatedAt = time.Now()
+}
+
+// AgentTmuxName returns the tmux session name hosting the session's agent
+// process — the shell session's TmuxName with the conventional "-agent"
+// suffix.
+func (s Session) AgentTmuxName() string {
+	return s.TmuxName + "-agent"
 }
 
 // BranchScope discriminates whether a BranchInfo points at a local branch

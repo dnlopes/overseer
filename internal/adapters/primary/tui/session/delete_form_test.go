@@ -59,9 +59,9 @@ func TestDeleteForm_EnterAlsoConfirms(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
-		Return(makeTmuxSession(sess.ID.String()), nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
+		Return(makeTmuxSession(sess.TmuxName), nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.TmuxName).Return(nil).Once()
 	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
 
 	form := NewDeleteForm(styles.New(), svc, sess)
@@ -91,9 +91,9 @@ func TestDeleteForm_YConfirmCallsServiceAndEmitsDeletedMsg(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
-		Return(makeTmuxSession(sess.ID.String()), nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
+		Return(makeTmuxSession(sess.TmuxName), nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.TmuxName).Return(nil).Once()
 	repo.EXPECT().Delete(mock.Anything, sess.ID).Return(nil).Once()
 
 	form := NewDeleteForm(styles.New(), svc, sess)
