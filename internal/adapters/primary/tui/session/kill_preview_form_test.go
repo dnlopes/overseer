@@ -44,9 +44,9 @@ func TestKillPreviewForm_EnterConfirmsKill_Shell(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()).
-		Return(makeTmuxSession(sess.ID.String()), nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()).Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.TmuxName).
+		Return(makeTmuxSession(sess.TmuxName), nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.TmuxName).Return(nil).Once()
 
 	form := NewKillPreviewForm(styles.New(), svc, sess.ID, sess.Name, "Shell")
 
@@ -64,9 +64,9 @@ func TestKillPreviewForm_EnterConfirmsKill_Agent(t *testing.T) {
 	sess := testutil.MakeSession("alpha", uuid.New())
 	svc, repo, _, tmux, _ := newCreateFormSessionServiceWithMocks(t)
 	repo.EXPECT().Get(mock.Anything, sess.ID).Return(sess, nil).Once()
-	tmux.EXPECT().GetSession(mock.Anything, sess.ID.String()+"-agent").
-		Return(makeTmuxSession(sess.ID.String()+"-agent"), nil).Once()
-	tmux.EXPECT().KillSession(mock.Anything, sess.ID.String()+"-agent").Return(nil).Once()
+	tmux.EXPECT().GetSession(mock.Anything, sess.AgentTmuxName()).
+		Return(makeTmuxSession(sess.AgentTmuxName()), nil).Once()
+	tmux.EXPECT().KillSession(mock.Anything, sess.AgentTmuxName()).Return(nil).Once()
 
 	form := NewKillPreviewForm(styles.New(), svc, sess.ID, sess.Name, "Agent")
 

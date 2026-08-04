@@ -92,7 +92,7 @@ func (s *AgentStatusService) PollAll(ctx context.Context, _ PollAllAgentStatuses
 
 func (s *AgentStatusService) pollOne(ctx context.Context, sess domain.Session) domain.AgentStatus {
 	now := time.Now()
-	agentTmuxID := sess.ID.String() + "-agent"
+	agentTmuxID := sess.AgentTmuxName()
 
 	if _, err := s.tmux.GetSession(ctx, agentTmuxID); err != nil {
 		if errors.Is(err, domain.ErrTmuxSessionNotFound) {

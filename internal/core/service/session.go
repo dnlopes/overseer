@@ -111,6 +111,8 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 		return CreateSessionResponse{}, fmt.Errorf("lookup project: %w", err)
 	}
 
+	sess.AssignTmuxName(project.Name)
+
 	var resolvedBaseBranch string
 	if req.CreateWorktree {
 		resolvedBaseBranch = strings.TrimSpace(req.BaseBranch)
@@ -162,7 +164,7 @@ func (s *SessionService) Create(ctx context.Context, req CreateSessionRequest) (
 func (s *SessionService) spinUpTmuxAndPersist(ctx context.Context, sess domain.Session, project domain.Project) (domain.Session, error) {
 	workDir := sessionWorkingDir(sess, project)
 
-	if _, err := s.tmux.CreateSession(ctx, sess.ID.String(), workDir, ""); err != nil {
+	if _, err := s.tmux.CreateSession(ctx, sess.TmuxName, workDir, ""); err != nil {
 		return domain.Session{}, fmt.Errorf("create tmux session: %w", err)
 	}
 
@@ -170,8 +172,8 @@ func (s *SessionService) spinUpTmuxAndPersist(ctx context.Context, sess domain.S
 	if agentCmd == "" {
 		agentCmd = s.defaultLauncher.Command
 	}
-	if _, err := s.tmux.CreateSession(ctx, sess.ID.String()+"-agent", workDir, agentCmd); err != nil {
-		_ = s.tmux.KillSession(ctx, sess.ID.String())
+	if _, err := s.tmux.CreateSession(ctx, sess.AgentTmuxName(), workDir, agentCmd); err != nil {
+		_ = s.tmux.KillSession(ctx, sess.TmuxName)
 		return domain.Session{}, fmt.Errorf("create agent tmux session: %w", err)
 	}
 
@@ -481,7 +483,7 @@ func (s *SessionService) AttachShell(ctx context.Context, req AttachShellRequest
 		return AttachShellResponse{}, err
 	}
 
-	tmuxID := sess.ID.String()
+	tmuxID := sess.TmuxName
 	if err := s.ensureTmuxSession(ctx, tmuxID, sess, ""); err != nil {
 		return AttachShellResponse{}, err
 	}
@@ -514,7 +516,7 @@ func (s *SessionService) AttachAgent(ctx context.Context, req AttachAgentRequest
 		return AttachAgentResponse{}, err
 	}
 
-	agentTmuxID := sess.ID.String() + "-agent"
+	agentTmuxID := sess.AgentTmuxName()
 	agentCmd := sess.AgentCommand
 	if agentCmd == "" {
 		agentCmd = s.defaultLauncher.Command
@@ -630,9 +632,9 @@ func (s *SessionService) PreviewSession(ctx context.Context, req PreviewSessionR
 		return PreviewSessionResponse{}, err
 	}
 
-	tmuxID := sess.ID.String()
+	tmuxID := sess.TmuxName
 	if req.Kind == PreviewKindAgent {
-		tmuxID += "-agent"
+		tmuxID = sess.AgentTmuxName()
 	}
 
 	if req.Width > 0 && req.Height > 0 {
@@ -669,9 +671,9 @@ func (s *SessionService) KillPreviewSession(ctx context.Context, req KillPreview
 		return KillPreviewSessionResponse{}, err
 	}
 
-	tmuxID := sess.ID.String()
+	tmuxID := sess.TmuxName
 	if req.Kind == PreviewKindAgent {
-		tmuxID += "-agent"
+		tmuxID = sess.AgentTmuxName()
 	}
 
 	if err := s.killTmuxIfExists(ctx, tmuxID); err != nil {
@@ -727,7 +729,7 @@ func (s *SessionService) Delete(ctx context.Context, req DeleteSessionRequest) (
 		}
 	}
 
-	if err := s.killTmuxIfExists(ctx, sess.ID.String()); err != nil {
+	if err := s.killTmuxIfExists(ctx, sess.TmuxName); err != nil {
 		return DeleteSessionResponse{}, err
 	}
 

@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	"strings"
+	"regexp"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
@@ -17,6 +17,7 @@ func MakeSession(name string, projectID uuid.UUID) domain.Session {
 	if err != nil {
 		panic(err)
 	}
+	s.AssignTmuxName("project")
 	return s
 }
 
@@ -30,6 +31,7 @@ func MakeSessionWithWorktree(name string, projectID uuid.UUID, worktreePath, bra
 	if err := s.AssignWorktree(worktreePath, branch); err != nil {
 		panic(err)
 	}
+	s.AssignTmuxName("project")
 	return s
 }
 
@@ -41,23 +43,27 @@ func MakeProject(path, name string) domain.Project {
 	return p
 }
 
-// UUIDString matches any string that parses as a UUID — used to assert the service
-// passes a Session.ID (rather than a user-typed name) as the tmux session name.
-func UUIDString() interface{} {
+// tmuxNamePattern matches a well-formed shell tmux session name of the form
+// "<repository>-<session-name>-<guid8>" (see domain.TmuxSessionName).
+var tmuxNamePattern = regexp.MustCompile(`^[a-z0-9-]+-[0-9a-f]{8}$`)
+
+// agentTmuxNamePattern matches the agent variant of the tmux session name:
+// tmuxNamePattern with the conventional "-agent" suffix.
+var agentTmuxNamePattern = regexp.MustCompile(`^[a-z0-9-]+-[0-9a-f]{8}-agent$`)
+
+// TmuxNameString matches any well-formed shell tmux session name — used to
+// assert the service passes the sanitized Session.TmuxName (rather than a
+// raw Session.ID) to the tmux adapter.
+func TmuxNameString() interface{} {
 	return mock.MatchedBy(func(s string) bool {
-		_, err := uuid.Parse(s)
-		return err == nil
+		return tmuxNamePattern.MatchString(s)
 	})
 }
 
-// AgentTmuxIDString matches strings of the form "<uuid>-agent", used by the
-// service to name the tmux session that hosts the agent process.
-func AgentTmuxIDString() interface{} {
+// AgentTmuxNameString matches well-formed agent tmux session names, used by
+// the service to name the tmux session that hosts the agent process.
+func AgentTmuxNameString() interface{} {
 	return mock.MatchedBy(func(s string) bool {
-		if !strings.HasSuffix(s, "-agent") {
-			return false
-		}
-		_, err := uuid.Parse(strings.TrimSuffix(s, "-agent"))
-		return err == nil
+		return agentTmuxNamePattern.MatchString(s)
 	})
 }
