@@ -1,0 +1,19 @@
+name: CI - Dependabot
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [synchronize]
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  merge:
+    uses: dnlopes/Reusable.Workflows/.github/workflows/dependabot-merge.yaml@v1
+    secrets:
+      DEPENDABOT_MERGE_TOKEN: ${{ secrets.DEPENDABOT_MERGE_TOKEN }}
