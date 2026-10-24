@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    ignore:
+      - dependency-name: "dnlopes/Reusable.Workflows*"
+    groups:
+      github-actions-non-major:
+        update-types: [minor, patch]
+      github-actions-major:
+        update-types: [major]
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      gomod-non-major:
+        update-types: [minor, patch]
+      gomod-major:
+        update-types: [major]
